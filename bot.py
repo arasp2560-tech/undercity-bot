@@ -348,3 +348,54 @@ async def show_bank(query, user):
         text,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+
+# =========================
+# RUN BOT
+# =========================
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user = update.effective_user
+
+    if query.data == "profile":
+        await show_profile(query, user)
+
+    elif query.data == "wallet":
+        await show_wallet(query, user)
+
+    elif query.data == "cash":
+        await show_cash(query, user)
+
+    elif query.data == "bank":
+        await show_bank(query, user)
+
+    elif query.data == "main":
+        await query.edit_message_text(
+            "🏙️ منوی اصلی UNDERCITY",
+            reply_markup=main_menu()
+        )
+
+
+def main():
+    token = os.environ.get("BOT_TOKEN")
+
+    if not token:
+        raise RuntimeError("BOT_TOKEN is not set")
+
+    threading.Thread(target=run_server, daemon=True).start()
+
+    app = Application.builder().token(token).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+
+    print("UNDERCITY bot is running...")
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()

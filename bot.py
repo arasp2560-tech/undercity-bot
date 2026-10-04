@@ -2,12 +2,21 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
 
 
 PORT = int(os.environ.get("PORT", 10000))
 
+
+# -------------------------
+# Server for Render
+# -------------------------
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -24,7 +33,49 @@ def run_server():
     server.serve_forever()
 
 
+# -------------------------
+# Main Menu
+# -------------------------
+
+def main_menu():
+    keyboard = [
+        [
+            InlineKeyboardButton("👤 پروفایل", callback_data="profile"),
+            InlineKeyboardButton("💰 کیف پول", callback_data="wallet"),
+        ],
+        [
+            InlineKeyboardButton("🏙️ شهر", callback_data="city"),
+            InlineKeyboardButton("🏠 املاک", callback_data="properties"),
+        ],
+        [
+            InlineKeyboardButton("🚗 وسایل نقلیه", callback_data="vehicles"),
+            InlineKeyboardButton("🏢 کسب‌وکارها", callback_data="businesses"),
+        ],
+        [
+            InlineKeyboardButton("📈 بازار", callback_data="market"),
+            InlineKeyboardButton("🕶️ دنیای زیرزمینی", callback_data="underground"),
+        ],
+        [
+            InlineKeyboardButton("🤝 باند و اتحاد", callback_data="gang"),
+        ],
+        [
+            InlineKeyboardButton("🏥 درمانگاه", callback_data="clinic"),
+            InlineKeyboardButton("💊 داروخانه", callback_data="pharmacy"),
+        ],
+        [
+            InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings"),
+        ],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+# -------------------------
+# Start
+# -------------------------
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
         "🌃 به UNDERCITY خوش آمدی\n\n"
 
@@ -44,71 +95,149 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "و از اقتصاد شهر سود ببر.\n\n"
 
         "📈 خرید، فروش و دلالی\n"
-        "در بازار شهر معامله کن، قیمت‌ها را دنبال کن، "
-        "کالا و دارایی بخر و بفروش و از اختلاف قیمت‌ها سود ببر.\n\n"
+        "در بازار شهر معامله کن و از اختلاف قیمت‌ها سود ببر.\n\n"
 
         "🚗 وسایل نقلیه زمینی\n"
-        "از خودروهای شهری و اسپرت گرفته تا خودروهای سنگین، "
-        "زرهی، موتورسیکلت و وسایل نقلیه ویژه را خریداری، "
-        "فروش و ارتقا بده.\n\n"
+        "خودرو، موتورسیکلت، خودروهای سنگین، زرهی و وسایل نقلیه ویژه.\n\n"
 
         "🚤 وسایل نقلیه آبی\n"
-        "قایق، کشتی و دیگر وسایل نقلیه دریایی را به دست بیاور "
-        "و در آب‌های UNDERCITY از آن‌ها استفاده کن.\n\n"
+        "قایق، کشتی و دیگر وسایل نقلیه دریایی.\n\n"
 
         "✈️ وسایل نقلیه هوایی\n"
-        "هلیکوپتر، هواپیما، جت و دیگر وسایل پرنده را تهیه کن "
-        "و آسمان شهر را زیر سلطه خودت دربیاور.\n\n"
+        "هلیکوپتر، هواپیما، جت و دیگر وسایل پرنده.\n\n"
 
         "🌊🚙 وسایل نقلیه آبی‌خاکی\n"
-        "وسایل نقلیه مخصوص خشکی و آب را به دست بیاور "
-        "و به مناطقی دسترسی پیدا کن که دیگران نمی‌توانند.\n\n"
+        "وسایل نقلیه مخصوص خشکی و آب.\n\n"
 
         "🕶️ دنیای زیرزمینی\n"
-        "وارد فعالیت‌های خلافکارانه شو؛ از معاملات غیرقانونی "
-        "و سرقت گرفته تا مأموریت‌های خطرناک و عملیات گروهی.\n\n"
+        "فعالیت‌های خلافکارانه، معاملات غیرقانونی، سرقت و مأموریت‌های خطرناک.\n\n"
 
         "🔫 درگیری و نبرد\n"
-        "در نبردهای بازی شرکت کن و از تجهیزات مختلف استفاده کن؛ "
-        "از سلاح‌های سبک و سنگین گرفته تا خودروهای زرهی، "
-        "تانک، هلیکوپتر، جنگنده، ناو و دیگر تجهیزات نظامی.\n\n"
+        "نبردهای بازی با تجهیزات مختلف؛ از سلاح‌های سبک و سنگین "
+        "تا خودروهای زرهی، تانک، هلیکوپتر، جنگنده و ناو.\n\n"
 
         "🤝 باند و اتحاد\n"
-        "گروه خودت را تشکیل بده، متحد پیدا کن، قلمرو و نفوذ "
-        "به دست بیاور و با گروه‌های رقیب رقابت کن.\n\n"
+        "گروه خودت را تشکیل بده، متحد پیدا کن و قلمرو و نفوذ به دست بیاور.\n\n"
 
-        "🏥 درمانگاه و مراقبت پزشکی\n"
-        "برای آسیب‌ها و وضعیت جسمانی شخصیتت به مراکز درمانی "
-        "شهر مراجعه کن و شرایط خودت را مدیریت کن.\n\n"
+        "🏥 درمانگاه و 💊 داروخانه\n"
+        "وضعیت شخصیتت را مدیریت کن و برای شرایط مختلف آماده باش.\n\n"
 
-        "💊 داروخانه\n"
-        "اقلام و داروهای موردنیاز شخصیتت را از داروخانه‌های شهر "
-        "تهیه کن و برای شرایط مختلف آماده باش.\n\n"
-
-        "🌆 شهر را بشناس\n"
-        "مناطق مختلف شهر، بازارها، مراکز صنعتی، مناطق ثروتمند، "
-        "محله‌های خطرناک و مکان‌های مخفی را کشف کن.\n\n"
-
-        "👑 هدف نهایی\n"
-        "ثروت، قدرت، نفوذ و اعتبار خودت را افزایش بده "
-        "و امپراتوری خودت را بساز.\n\n"
+        "🌆 شهر را کشف کن و امپراتوری خودت را بساز.\n\n"
 
         "⚠️ UNDERCITY هنوز در حال توسعه است...\n\n"
 
-        "هر انتخابی که می‌کنی، می‌تواند مسیر بازی تو را تغییر دهد.\n\n"
-
-        "🏙️ شهر منتظر توست."
+        "👇 از منوی زیر شروع کن:",
+        reply_markup=main_menu()
     )
 
 
+# -------------------------
+# Button Handler
+# -------------------------
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "profile":
+        text = (
+            "👤 پروفایل\n\n"
+            "🚧 این بخش در حال ساخت است.\n\n"
+            "به‌زودی اطلاعات شخصیت، سطح، تجربه، اعتبار، "
+            "دارایی‌ها و وضعیت بازیکن اینجا نمایش داده می‌شود."
+        )
+
+    elif query.data == "wallet":
+        text = "💰 کیف پول\n\n🚧 این بخش در حال ساخت است."
+
+    elif query.data == "city":
+        text = "🏙️ شهر\n\n🚧 نقشه و مناطق شهر در حال ساخت است."
+
+    elif query.data == "properties":
+        text = "🏠 املاک\n\n🚧 سیستم خرید و مدیریت املاک در حال ساخت است."
+
+    elif query.data == "vehicles":
+        text = "🚗 وسایل نقلیه\n\n🚧 سیستم وسایل نقلیه در حال ساخت است."
+
+    elif query.data == "businesses":
+        text = "🏢 کسب‌وکارها\n\n🚧 سیستم کسب‌وکار و کارخانه‌ها در حال ساخت است."
+
+    elif query.data == "market":
+        text = "📈 بازار\n\n🚧 بازار پویا و سیستم خرید و فروش در حال ساخت است."
+
+    elif query.data == "underground":
+        text = "🕶️ دنیای زیرزمینی\n\n🚧 این بخش در حال ساخت است."
+
+    elif query.data == "gang":
+        text = "🤝 باند و اتحاد\n\n🚧 سیستم باندها و اتحادها در حال ساخت است."
+
+    elif query.data == "clinic":
+        text = "🏥 درمانگاه\n\n🚧 سیستم درمان و وضعیت جسمانی در حال ساخت است."
+
+    elif query.data == "pharmacy":
+        text = "💊 داروخانه\n\n🚧 سیستم داروخانه در حال ساخت است."
+
+    elif query.data == "settings":
+        text = "⚙️ تنظیمات\n\n🚧 تنظیمات بازی در حال ساخت است."
+
+    else:
+        text = "❌ گزینه نامعتبر است."
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 بازگشت به منوی اصلی", callback_data="main_menu")]
+        ])
+    )
+
+
+# -------------------------
+# Back to Main Menu
+# -------------------------
+
+async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(
+        "🌃 **UNDERCITY**\n\n"
+        "👇 از منوی اصلی انتخاب کن:",
+        reply_markup=main_menu(),
+        parse_mode="Markdown"
+    )
+
+
+# -------------------------
+# Main
+# -------------------------
+
 def main():
+
     token = os.environ["BOT_TOKEN"]
 
-    threading.Thread(target=run_server, daemon=True).start()
+    threading.Thread(
+        target=run_server,
+        daemon=True
+    ).start()
 
     app = Application.builder().token(token).build()
 
     app.add_handler(CommandHandler("start", start))
+
+    app.add_handler(
+        CallbackQueryHandler(
+            back_to_menu,
+            pattern="^main_menu$"
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            button_handler
+        )
+    )
 
     print("UNDERCITY is running...")
 

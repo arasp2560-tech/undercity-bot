@@ -333,3 +333,18 @@ async def show_bank(query, user):
 
     text = (
         "🏦 بانک\n\n"
+        f"موجودی حساب شما:\n"
+        f"${player['bank_balance']:,}\n\n"
+        "🏦 بانک برای نگهداری امن پول و انجام تراکنش‌ها استفاده می‌شود."
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("📥 واریز به بانک", callback_data="deposit")],
+        [InlineKeyboardButton("📤 برداشت از بانک", callback_data="withdraw")],
+        [InlineKeyboardButton("🔙 کیف پول", callback_data="wallet")]
+    ]
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )

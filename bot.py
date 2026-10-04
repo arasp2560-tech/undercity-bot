@@ -67,7 +67,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         "⚠️ UNDERCITY هنوز در حال توسعه است...\n\n"
         "هر انتخابی که می‌کنی، می‌تواند مسیر بازی تو را تغییر دهد.\n\n"
-        "🏙️ شهر منتظر توست.    )
+        "🏙️ شهر منتظر توست.   
+        )
+
     
     
     def main():

@@ -69,6 +69,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "هر انتخابی که می‌کنی، می‌تواند مسیر بازی تو را تغییر دهد.\n\n"
         "🏙️ شهر منتظر توست."
     )
+    
     def main():
     token = os.environ["BOT_TOKEN"]
 

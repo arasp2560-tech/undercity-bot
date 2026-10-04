@@ -16,14 +16,22 @@ from telegram.ext import (
 PORT = int(os.environ.get("PORT", 10000))
 PLAYERS_FILE = "players.json"
 
+# =========================
+# MASTER
+# =========================
+
+MASTER_USER_ID = int(os.environ.get("MASTER_USER_ID", "0"))
+
 
 # =========================
 # HTTP SERVER FOR RENDER
 # =========================
 
 class HealthHandler(BaseHTTPRequestHandler):
+
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write(b"UNDERCITY is alive")
 
@@ -50,7 +58,53 @@ def load_players():
 
 def save_players(players):
     with open(PLAYERS_FILE, "w", encoding="utf-8") as file:
-        json.dump(players, file, ensure_ascii=False, indent=2)
+        json.dump(
+            players,
+            file,
+            ensure_ascii=False,
+            indent=2
+        )
+
+
+def default_player(user):
+    return {
+        "name": user.first_name or "Player",
+        "username": user.username or "",
+
+        "level": 1,
+        "xp": 0,
+
+        "money": 10000,
+
+        "cash": 10000,
+        "bank_balance": 0,
+
+        "credit_score": 500,
+
+        "loan": {
+            "active": False,
+            "principal": 0,
+            "remaining": 0,
+            "interest_rate": 0,
+            "installment": 0,
+            "next_payment": None
+        },
+
+        "transactions": [],
+
+        "reputation": 0,
+        "location": "پایین‌شهر",
+
+        "home": {
+            "type": "اتاق اجاره‌ای",
+            "name": "اتاق کوچک پایین‌شهر",
+            "rent": 200
+        },
+
+        "properties": [],
+        "vehicles": [],
+        "businesses": []
+    }
 
 
 def get_player(user):
@@ -58,50 +112,17 @@ def get_player(user):
     user_id = str(user.id)
 
     if user_id not in players:
-        players[user_id] = {
-            "name": user.first_name or "Player",
-            "username": user.username or "",
-
-            "level": 1,
-            "xp": 0,
-
-            "money": 10000,
-
-            "cash": 10000,
-            "bank_balance": 0,
-
-            "credit_score": 500,
-
-            "loan": {
-                "active": False,
-                "principal": 0,
-                "remaining": 0,
-                "interest_rate": 0,
-                "installment": 0,
-                "next_payment": None
-            },
-
-            "transactions": [],
-
-            "reputation": 0,
-            "location": "پایین‌شهر",
-
-            "home": {
-                "type": "اتاق اجاره‌ای",
-                "name": "اتاق کوچک پایین‌شهر",
-                "rent": 200
-            },
-
-            "properties": [],
-            "vehicles": [],
-            "businesses": []
-        }
-
+        players[user_id] = default_player(user)
         save_players(players)
 
     else:
         player = players[user_id]
 
+        # اطلاعات پایه
+        player["name"] = user.first_name or player.get("name", "Player")
+        player["username"] = user.username or ""
+
+        # سازگاری با نسخه‌های قبلی
         if "cash" not in player:
             player["cash"] = player.get("money", 10000)
 
@@ -124,8 +145,21 @@ def get_player(user):
         if "transactions" not in player:
             player["transactions"] = []
 
-        if "username" not in player:
-            player["username"] = user.username or ""
+        if "properties" not in player:
+            player["properties"] = []
+
+        if "vehicles" not in player:
+            player["vehicles"] = []
+
+        if "businesses" not in player:
+            player["businesses"] = []
+
+        if "home" not in player:
+            player["home"] = {
+                "type": "اتاق اجاره‌ای",
+                "name": "اتاق کوچک پایین‌شهر",
+                "rent": 200
+            }
 
         save_players(players)
 
@@ -223,13 +257,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     player = get_player(user)
 
+    if user.id == MASTER_USER_ID:
+        title = "👑 MASTER"
+    else:
+        title = "🏙️ UNDERCITY"
+
     text = (
-        f"🏙️ به UNDERCITY خوش آمدی، {player['name']}!\n\n"
+        f"{title}\n\n"
+        f"خوش آمدی، {player['name']}!\n\n"
         "اینجا شهریه که از پایین‌ترین نقطه می‌تونی شروع کنی "
         "و قدم‌به‌قدم به یک امپراتوری بزرگ برسی.\n\n"
-        "💵 سرمایه اولیه: 10,000$\n"
-        "📍 محل شروع: پایین‌شهر\n"
-        "🏠 خانه: اتاق کوچک پایین‌شهر\n\n"
+        f"💵 پول نقد: ${player['cash']:,}\n"
+        f"🏦 بانک: ${player['bank_balance']:,}\n"
+        f"📍 محل شروع: {player['location']}\n"
+        f"🏠 خانه: {player['home']['name']}\n\n"
         "انتخاب با توئه..."
     )
 
@@ -290,7 +331,7 @@ async def show_wallet(query, user):
         f"🏦 موجودی بانک: ${player['bank_balance']:,}\n"
         "━━━━━━━━━━━━━━\n"
         f"💰 مجموع پول: ${total:,}\n\n"
-        "💸 انتقال وجه از حساب بانکی انجام می‌شود."
+        "انتخاب کن:"
     )
 
     await query.edit_message_text(
@@ -314,8 +355,18 @@ async def show_cash(query, user):
     )
 
     keyboard = [
-        [InlineKeyboardButton("📥 واریز به بانک", callback_data="deposit")],
-        [InlineKeyboardButton("🔙 کیف پول", callback_data="wallet")]
+        [
+            InlineKeyboardButton(
+                "📥 واریز به بانک",
+                callback_data="deposit"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔙 کیف پول",
+                callback_data="wallet"
+            )
+        ]
     ]
 
     await query.edit_message_text(
@@ -335,13 +386,38 @@ async def show_bank(query, user):
         "🏦 بانک\n\n"
         f"موجودی حساب شما:\n"
         f"${player['bank_balance']:,}\n\n"
-        "🏦 بانک برای نگهداری امن پول و انجام تراکنش‌ها استفاده می‌شود."
+        "بانک برای نگهداری پول و انجام تراکنش‌ها استفاده می‌شود."
     )
 
     keyboard = [
-        [InlineKeyboardButton("📥 واریز به بانک", callback_data="deposit")],
-        [InlineKeyboardButton("📤 برداشت از بانک", callback_data="withdraw")],
-        [InlineKeyboardButton("🔙 کیف پول", callback_data="wallet")]
+        [
+            InlineKeyboardButton(
+                "📥 واریز به بانک",
+                callback_data="deposit"
+            ),
+            InlineKeyboardButton(
+                "📤 برداشت از بانک",
+                callback_data="withdraw"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "💸 انتقال وجه",
+                callback_data="transfer"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📜 تراکنش‌ها",
+                callback_data="transactions"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔙 کیف پول",
+                callback_data="wallet"
+            )
+        ]
     ]
 
     await query.edit_message_text(
@@ -351,126 +427,296 @@ async def show_bank(query, user):
 
 
 # =========================
+# DEPOSIT
+# =========================
+
+async def deposit_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    player = get_player(user)
+
+    parts = update.message.text.strip().split()
+
+    if len(parts) != 2:
+        await update.message.reply_text(
+            "❌ فرمت صحیح:\n\n"
+            "واریز 5000"
+        )
+        return
+
+    try:
+        amount = int(parts[1])
+    except ValueError:
+        await update.message.reply_text(
+            "❌ مبلغ باید عدد باشد."
+        )
+        return
+
+    if amount <= 0:
+        await update.message.reply_text(
+            "❌ مبلغ باید بیشتر از صفر باشد."
+        )
+        return
+
+    if player["cash"] < amount:
+        await update.message.reply_text(
+            "❌ پول نقد کافی نیست."
+        )
+        return
+
+    player["cash"] -= amount
+    player["bank_balance"] += amount
+
+    add_transaction(
+        player,
+        "deposit",
+        amount,
+        "واریز پول نقد به بانک"
+    )
+
+    players = load_players()
+    players[str(user.id)] = player
+    save_players(players)
+
+    await update.message.reply_text(
+        "✅ واریز انجام شد.\n\n"
+        f"📥 مبلغ: ${amount:,}\n"
+        f"💵 نقد: ${player['cash']:,}\n"
+        f"🏦 بانک: ${player['bank_balance']:,}"
+    )
+
+
+# =========================
+# WITHDRAW
+# =========================
+
+async def withdraw_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    player = get_player(user)
+
+    parts = update.message.text.strip().split()
+
+    if len(parts) != 2:
+        await update.message.reply_text(
+            "❌ فرمت صحیح:\n\n"
+            "برداشت 5000"
+        )
+        return
+
+    try:
+        amount = int(parts[1])
+    except ValueError:
+        await update.message.reply_text(
+            "❌ مبلغ باید عدد باشد."
+        )
+        return
+
+    if amount <= 0:
+        await update.message.reply_text(
+            "❌ مبلغ باید بیشتر از صفر باشد."
+        )
+        return
+
+    if player["bank_balance"] < amount:
+        await update.message.reply_text(
+            "❌ موجودی بانک کافی نیست."
+        )
+        return
+
+    player["bank_balance"] -= amount
+    player["cash"] += amount
+
+    add_transaction(
+        player,
+        "withdraw",
+        amount,
+        "برداشت پول از بانک"
+    )
+
+    players = load_players()
+    players[str(user.id)] = player
+    save_players(players)
+
+    await update.message.reply_text(
+        "✅ برداشت انجام شد.\n\n"
+        f"📤 مبلغ: ${amount:,}\n"
+        f"💵 نقد: ${player['cash']:,}\n"
+        f"🏦 بانک: ${player['bank_balance']:,}"
+    )
+
+
+# =========================
+# FIND PLAYER
+# =========================
+
+def find_player_by_username(username):
+    username = username.strip().lstrip("@").lower()
+
+    players = load_players()
+
+    for user_id, player in players.items():
+        saved_username = str(
+            player.get("username", "")
+        ).lower()
+
+        if saved_username == username:
+            return user_id, player
+
+    return None, None
+
+
+# =========================
 # MONEY TRANSFER
 # =========================
 
 async def transfer_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
     message = update.message
+    sender_user = update.effective_user
 
     if not message:
         return
 
-    parts = message.text.strip().split()
+    text = message.text.strip()
+    parts = text.split()
 
-    # انتقال با Reply
+    # ---------------------------------
+    # Reply transfer
+    # انتقال پول 5000
+    # ---------------------------------
+
     if message.reply_to_message:
+
         target_user = message.reply_to_message.from_user
 
         if not target_user:
-            await message.reply_text("❌ مقصد انتقال پیدا نشد.")
+            await message.reply_text(
+                "❌ مقصد انتقال پیدا نشد."
+            )
             return
 
-        if target_user.id == user.id:
-            await message.reply_text("❌ نمی‌توانی به خودت پول انتقال بدهی.")
+        if target_user.id == sender_user.id:
+            await message.reply_text(
+                "❌ نمی‌توانی به خودت پول انتقال بدهی."
+            )
             return
 
-        if len(parts) != 2:
+        if len(parts) != 3 or parts[0] != "انتقال" or parts[1] != "پول":
             await message.reply_text(
                 "❌ فرمت صحیح:\n\n"
                 "انتقال پول 5000\n\n"
-                "این پیام را به پیام شخص موردنظر Reply کن."
+                "این پیام را روی پیام بازیکن مقصد Reply کن."
             )
             return
 
         try:
-            amount = int(parts[1])
+            amount = int(parts[2])
         except ValueError:
-            await message.reply_text("❌ مبلغ باید عدد باشد.")
-            return
-
-    # انتقال با ID
-    else:
-        if len(parts) != 4 or parts[2] != "به":
             await message.reply_text(
-                "❌ فرمت صحیح:\n\n"
-                "انتقال پول 5000 به 123456789"
+                "❌ مبلغ باید عدد باشد."
             )
             return
+
+        target_id = str(target_user.id)
+
+    # ---------------------------------
+    # ID transfer
+    # انتقال پول 5000 به 123456789
+    # ---------------------------------
+
+    elif len(parts) == 4 and parts[0] == "انتقال" and parts[1] == "پول" and parts[2] == "به":
 
         try:
-            amount = int(parts[1])
-            target_id = int(parts[3])
+            amount = int(parts[3])
         except ValueError:
-            await message.reply_text("❌ مبلغ و ID باید عدد باشند.")
-            return
-
-        if target_id == user.id:
-            await message.reply_text("❌ نمی‌توانی به خودت پول انتقال بدهی.")
-            return
-
-        target_user = None
-        players = load_players()
-
-        if str(target_id) not in players:
             await message.reply_text(
-                "❌ این بازیکن هنوز ربات را فعال نکرده است.\n"
-                "ابتدا باید با /start وارد UNDERCITY شود."
+                "❌ مبلغ باید عدد باشد."
             )
             return
 
-        target_player_data = players[str(target_id)]
-
-    # بررسی مبلغ
-    if amount <= 0:
-        await message.reply_text("❌ مبلغ انتقال باید بیشتر از صفر باشد.")
-        return
-
-    # دریافت اطلاعات فرستنده
-    players = load_players()
-    sender_id = str(user.id)
-
-    if sender_id not in players:
-        get_player(user)
-        players = load_players()
-
-    sender = players[sender_id]
-
-    # اطمینان از وجود موجودی بانک
-    if "bank_balance" not in sender:
-        sender["bank_balance"] = sender.get("money", 10000)
-
-    # بررسی موجودی
-    if sender["bank_balance"] < amount:
         await message.reply_text(
-            "❌ موجودی حساب بانکی کافی نیست.\n\n"
-            f"🏦 موجودی: ${sender['bank_balance']:,}\n"
-            f"💸 مبلغ انتقال: ${amount:,}"
+            "❌ برای انتقال با ID از این فرمت استفاده کن:\n\n"
+            "انتقال پول 5000 به 123456789"
         )
         return
 
-    # اطلاعات مقصد در حالت Reply
-    if message.reply_to_message:
-        target_id = target_user.id
+    # ---------------------------------
+    # Username transfer
+    # انتقال پول 5000 به @username
+    # ---------------------------------
 
-        if str(target_id) not in players:
-            get_player(target_user)
-            players = load_players()
+    elif len(parts) == 5 and parts[0] == "انتقال" and parts[1] == "پول" and parts[2] == "به":
 
-        target = players[str(target_id)]
+        try:
+            amount = int(parts[3])
+        except ValueError:
+            await message.reply_text(
+                "❌ مبلغ باید عدد باشد."
+            )
+            return
 
-    # اطلاعات مقصد در حالت ID
+        username = parts[4]
+
+        target_id, target = find_player_by_username(username)
+
+        if not target_id:
+            await message.reply_text(
+                "❌ این username در UNDERCITY پیدا نشد.\n\n"
+                "بازیکن مقصد باید حداقل یک‌بار /start زده باشد."
+            )
+            return
+
     else:
-        target = players[str(target_id)]
+        return
 
-    if "bank_balance" not in target:
-        target["bank_balance"] = target.get("money", 10000)
+    # ---------------------------------
+    # General validation
+    # ---------------------------------
 
-    # انجام انتقال
+    if amount <= 0:
+        await message.reply_text(
+            "❌ مبلغ باید بیشتر از صفر باشد."
+        )
+        return
+
+    players = load_players()
+
+    sender_id = str(sender_user.id)
+
+    if sender_id not in players:
+        get_player(sender_user)
+        players = load_players()
+
+    if target_id not in players:
+        await message.reply_text(
+            "❌ بازیکن مقصد هنوز در UNDERCITY ثبت نشده است."
+        )
+        return
+
+    if target_id == sender_id:
+        await message.reply_text(
+            "❌ نمی‌توانی به خودت پول انتقال بدهی."
+        )
+        return
+
+    sender = players[sender_id]
+    target = players[target_id]
+
+    sender_balance = sender.get("bank_balance", 0)
+
+    if sender_balance < amount:
+        await message.reply_text(
+            "❌ موجودی حساب بانکی کافی نیست.\n\n"
+            f"🏦 موجودی: ${sender_balance:,}\n"
+            f"💸 مبلغ: ${amount:,}"
+        )
+        return
+
+    # ---------------------------------
+    # Transfer
+    # ---------------------------------
+
     sender["bank_balance"] -= amount
-    target["bank_balance"] += amount
+    target["bank_balance"] = target.get("bank_balance", 0) + amount
 
-    # ثبت تراکنش فرستنده
     add_transaction(
         sender,
         "transfer_sent",
@@ -478,7 +724,6 @@ async def transfer_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"انتقال به {target.get('name', 'Player')}"
     )
 
-    # ثبت تراکنش گیرنده
     add_transaction(
         target,
         "transfer_received",
@@ -490,10 +735,86 @@ async def transfer_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await message.reply_text(
         "✅ انتقال با موفقیت انجام شد.\n\n"
-        f"👤 فرستنده: {sender.get('name', 'Player')}\n"
         f"👤 گیرنده: {target.get('name', 'Player')}\n"
-        f"💸 مبلغ: ${amount:,}\n\n"
-        f"🏦 موجودی جدید شما: ${sender['bank_balance']:,}"
+        f"💸 مبلغ: ${amount:,}\n"
+        f"🏦 موجودی جدید: ${sender['bank_balance']:,}"
+    )
+
+
+# =========================
+# TRANSACTIONS
+# =========================
+
+async def show_transactions(query, user):
+    player = get_player(user)
+
+    transactions = player.get("transactions", [])
+
+    if not transactions:
+        text = (
+            "📜 تراکنش‌ها\n\n"
+            "هنوز هیچ تراکنشی ثبت نشده است."
+        )
+
+    else:
+        recent = transactions[-10:][::-1]
+
+        lines = ["📜 آخرین تراکنش‌ها\n"]
+
+        for item in recent:
+            transaction_type = item.get("type", "")
+            amount = item.get("amount", 0)
+            description = item.get("description", "")
+
+            if transaction_type in (
+                "transfer_received",
+            ):
+                sign = "+"
+            elif transaction_type in (
+                "transfer_sent",
+                "withdraw"
+            ):
+                sign = "-"
+            else:
+                sign = "+"
+
+            lines.append(
+                f"{sign}${amount:,} — {description}"
+            )
+
+        text = "\n".join(lines)
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🔙 کیف پول",
+                callback_data="wallet"
+            )
+        ]
+    ]
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+# =========================
+# PLACEHOLDER MENUS
+# =========================
+
+async def coming_soon(query):
+    await query.edit_message_text(
+        "🚧 این بخش هنوز در حال ساخت است.\n\n"
+        "به‌زودی امکانات بیشتری به UNDERCITY اضافه می‌شود.",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "🔙 منوی اصلی",
+                    callback_data="main"
+                )
+            ]
+        ])
     )
 
 
@@ -503,9 +824,18 @@ async def transfer_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+
     await query.answer()
 
     user = update.effective_user
+
+    # ---------------------------------
+    # Security
+    # ---------------------------------
+
+    # در نسخه فعلی، Telegram خودش مشخص می‌کند
+    # چه کسی روی دکمه کلیک کرده.
+    # اطلاعات هر بازیکن نیز با user.id جداست.
 
     if query.data == "profile":
         await show_profile(query, user)
@@ -519,16 +849,60 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "bank":
         await show_bank(query, user)
 
+    elif query.data == "transactions":
+        await show_transactions(query, user)
+
     elif query.data == "transfer":
         await query.edit_message_text(
             "💸 انتقال وجه\n\n"
-            "برای انتقال پول یکی از روش‌های زیر را استفاده کن:\n\n"
-            "1️⃣ روی پیام بازیکن Reply کن و بنویس:\n"
+            "دو روش داری:\n\n"
+            "1️⃣ Reply:\n"
+            "روی پیام بازیکن مقصد Reply کن و بنویس:\n"
             "انتقال پول 5000\n\n"
-            "2️⃣ با ID بنویس:\n"
-            "انتقال پول 5000 به 123456789",
+            "2️⃣ Username:\n"
+            "انتقال پول 5000 به @username\n\n"
+            "بازیکن مقصد باید قبلاً /start زده باشد.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 کیف پول", callback_data="wallet")]
+                [
+                    InlineKeyboardButton(
+                        "🔙 کیف پول",
+                        callback_data="wallet"
+                    )
+                ]
+            ])
+        )
+
+    elif query.data == "deposit":
+        await query.edit_message_text(
+            "📥 واریز به بانک\n\n"
+            "در یک پیام جدید بنویس:\n\n"
+            "واریز 5000\n\n"
+            "مثال:\n"
+            "واریز 10000",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(
+                        "🔙 بانک",
+                        callback_data="bank"
+                    )
+                ]
+            ])
+        )
+
+    elif query.data == "withdraw":
+        await query.edit_message_text(
+            "📤 برداشت از بانک\n\n"
+            "در یک پیام جدید بنویس:\n\n"
+            "برداشت 5000\n\n"
+            "مثال:\n"
+            "برداشت 10000",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(
+                        "🔙 بانک",
+                        callback_data="bank"
+                    )
+                ]
             ])
         )
 
@@ -538,41 +912,100 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_menu()
         )
 
+    elif query.data in (
+        "city",
+        "properties",
+        "vehicles",
+        "businesses",
+        "market",
+        "underground",
+        "gang",
+        "clinic",
+        "pharmacy",
+        "settings"
+    ):
+        await coming_soon(query)
+
 
 # =========================
-# RUN BOT
+# TEXT HANDLER
+# =========================
+
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+
+    parts = text.split()
+
+    if not parts:
+        return
+
+    # انتقال پول
+    if len(parts) >= 2 and parts[0] == "انتقال" and parts[1] == "پول":
+        await transfer_money(update, context)
+        return
+
+    # واریز
+    if parts[0] == "واریز":
+        await deposit_money(update, context)
+        return
+
+    # برداشت
+    if parts[0] == "برداشت":
+        await withdraw_money(update, context)
+        return
+
+    await update.message.reply_text(
+        "🤔 دستور شناخته نشد.\n\n"
+        "برای دیدن منوی بازی /start را بزن."
+    )
+
+
+# =========================
+# MAIN
 # =========================
 
 def main():
+
     token = os.environ.get("BOT_TOKEN")
 
     if not token:
-        raise RuntimeError("BOT_TOKEN is not set")
+        raise RuntimeError(
+            "BOT_TOKEN is not set in Render Environment Variables."
+        )
 
+    # HTTP server
     threading.Thread(
         target=run_server,
         daemon=True
     ).start()
 
+    # Telegram application
     app = Application.builder().token(token).build()
 
-    app.add_handler(CommandHandler("start", start))
-
     app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            transfer_money
-        )
+        CommandHandler("start", start)
     )
 
     app.add_handler(
         CallbackQueryHandler(button_handler)
     )
 
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            text_handler
+        )
+    )
+
     print("UNDERCITY bot is running...")
+    print(f"MASTER USER ID: {MASTER_USER_ID}")
 
     app.run_polling()
 
+
+# =========================
+# START
+# =========================
 
 if __name__ == "__main__":
     main()

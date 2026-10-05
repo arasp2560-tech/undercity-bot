@@ -6828,3 +6828,1951 @@ def combat_menu_keyboard(
                 ),
             )
       
+# ============================================================
+# PART 5
+# JOBS / CAREERS / TRAINING / WORK SYSTEM
+# ============================================================
+
+import random
+import time
+
+
+# ------------------------------------------------------------
+# JOB RANKS
+# ------------------------------------------------------------
+
+JOB_RANKS = [
+    {
+        "id": "apprentice",
+        "name": "🧹 کارآموز",
+        "min_xp": 0,
+        "multiplier": 0.75,
+    },
+    {
+        "id": "beginner",
+        "name": "🔧 مبتدی",
+        "min_xp": 100,
+        "multiplier": 0.90,
+    },
+    {
+        "id": "intermediate",
+        "name": "🛠 نیمه‌ماهر",
+        "min_xp": 300,
+        "multiplier": 1.00,
+    },
+    {
+        "id": "skilled",
+        "name": "⚙️ ماهر",
+        "min_xp": 700,
+        "multiplier": 1.15,
+    },
+    {
+        "id": "professional",
+        "name": "💼 حرفه‌ای",
+        "min_xp": 1500,
+        "multiplier": 1.35,
+    },
+    {
+        "id": "master",
+        "name": "👑 استادکار",
+        "min_xp": 3000,
+        "multiplier": 1.60,
+    },
+]
+
+
+# ------------------------------------------------------------
+# JOB DEFINITIONS
+# ------------------------------------------------------------
+
+JOB_DEFINITIONS = {
+    "barber": {
+        "name": "💈 آرایشگری",
+        "emoji": "💈",
+        "description": (
+            "اصلاح مو، کوتاهی، مدل‌دهی و خدمات آرایشی"
+        ),
+        "base_income": 90_000,
+        "max_income": 450_000,
+        "base_xp": 20,
+        "max_customers": 5,
+        "training_cost": 250_000,
+        "training_xp": 70,
+        "practice_cost": 30_000,
+        "practice_xp": 25,
+    },
+
+    "mechanic": {
+        "name": "🔧 مکانیکی",
+        "emoji": "🔧",
+        "description": (
+            "عیب‌یابی، تعمیر، سرویس و کار روی خودرو"
+        ),
+        "base_income": 130_000,
+        "max_income": 700_000,
+        "base_xp": 25,
+        "max_customers": 4,
+        "training_cost": 400_000,
+        "training_xp": 90,
+        "practice_cost": 50_000,
+        "practice_xp": 30,
+    },
+}
+
+
+# ------------------------------------------------------------
+# SAFE JOB INITIALIZATION
+# ------------------------------------------------------------
+
+def ensure_jobs(player):
+    """
+    ساختار شغل‌های بازیکن را بدون پاک کردن اطلاعات قبلی
+    تکمیل می‌کند.
+    """
+
+    player.setdefault("jobs", {})
+
+    for job_id in JOB_DEFINITIONS:
+        if job_id not in player["jobs"]:
+            player["jobs"][job_id] = {
+                "unlocked": False,
+                "rank": "apprentice",
+                "xp": 0,
+                "total_work": 0,
+                "total_customers": 0,
+                "total_income": 0,
+                "total_loss": 0,
+                "training_count": 0,
+                "practice_count": 0,
+                "last_work": 0,
+                "last_training": 0,
+                "last_practice": 0,
+            }
+
+        job = player["jobs"][job_id]
+
+        job.setdefault("unlocked", False)
+        job.setdefault("rank", "apprentice")
+        job.setdefault("xp", 0)
+        job.setdefault("total_work", 0)
+        job.setdefault("total_customers", 0)
+        job.setdefault("total_income", 0)
+        job.setdefault("total_loss", 0)
+        job.setdefault("training_count", 0)
+        job.setdefault("practice_count", 0)
+        job.setdefault("last_work", 0)
+        job.setdefault("last_training", 0)
+        job.setdefault("last_practice", 0)
+
+    return player
+
+
+# ------------------------------------------------------------
+# RANK HELPERS
+# ------------------------------------------------------------
+
+def get_job_rank(job_xp):
+    """
+    تعیین رتبه بر اساس XP شغل.
+    """
+
+    current = JOB_RANKS[0]
+
+    for rank in JOB_RANKS:
+        if job_xp >= rank["min_xp"]:
+            current = rank
+        else:
+            break
+
+    return current
+
+
+def get_next_job_rank(job_xp):
+    """
+    رتبه بعدی را برمی‌گرداند.
+    """
+
+    for rank in JOB_RANKS:
+        if job_xp < rank["min_xp"]:
+            return rank
+
+    return None
+
+
+def update_job_rank(job):
+    """
+    رتبه شغل را با توجه به XP به‌روزرسانی می‌کند.
+    """
+
+    old_rank = job.get("rank", "apprentice")
+
+    rank = get_job_rank(
+        int(job.get("xp", 0))
+    )
+
+    job["rank"] = rank["id"]
+
+    return old_rank, rank["id"]
+
+
+def rank_name(rank_id):
+    for rank in JOB_RANKS:
+        if rank["id"] == rank_id:
+            return rank["name"]
+
+    return "🧹 کارآموز"
+
+
+def rank_multiplier(rank_id):
+    for rank in JOB_RANKS:
+        if rank["id"] == rank_id:
+            return rank["multiplier"]
+
+    return 0.75
+
+
+# ------------------------------------------------------------
+# JOB XP
+# ------------------------------------------------------------
+
+def add_job_xp(player, job_id, amount):
+    """
+    XP مخصوص همان شغل.
+    """
+
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        return {
+            "amount": 0,
+            "old_rank": "apprentice",
+            "new_rank": "apprentice",
+            "promoted": False,
+        }
+
+    job = player["jobs"][job_id]
+
+    old_rank = job.get(
+        "rank",
+        "apprentice"
+    )
+
+    amount = max(0, int(amount))
+
+    job["xp"] = int(
+        job.get("xp", 0)
+    ) + amount
+
+    before_rank = old_rank
+
+    update_job_rank(job)
+
+    new_rank = job.get(
+        "rank",
+        "apprentice"
+    )
+
+    return {
+        "amount": amount,
+        "old_rank": before_rank,
+        "new_rank": new_rank,
+        "promoted": before_rank != new_rank,
+    }
+
+
+# ------------------------------------------------------------
+# JOB UNLOCK
+# ------------------------------------------------------------
+
+def unlock_job(player, job_id):
+    """
+    باز کردن یک شغل.
+    """
+
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        return False, "شغل وجود ندارد."
+
+    job = player["jobs"][job_id]
+
+    if job["unlocked"]:
+        return False, "این شغل قبلاً برای شما فعال شده است."
+
+    job["unlocked"] = True
+
+    save_players(load_players())
+
+    return True, "شغل با موفقیت فعال شد."
+
+
+# ------------------------------------------------------------
+# JOB ACCESS
+# ------------------------------------------------------------
+
+def job_is_unlocked(player, job_id):
+    ensure_jobs(player)
+
+    if job_id not in player["jobs"]:
+        return False
+
+    return bool(
+        player["jobs"][job_id].get(
+            "unlocked",
+            False
+        )
+    )
+
+
+# ------------------------------------------------------------
+# AUTO UNLOCK FIRST JOB
+# ------------------------------------------------------------
+
+def initialize_player_jobs(player):
+    """
+    شغل اولیه برای بازیکن جدید.
+    """
+
+    ensure_jobs(player)
+
+    # برای جلوگیری از تغییر ناخواسته بازیکنان قدیمی
+    # فقط در صورتی که هیچ شغلی فعال نیست
+    if not any(
+        job.get("unlocked", False)
+        for job in player["jobs"].values()
+    ):
+        player["jobs"]["barber"]["unlocked"] = True
+
+    return player
+
+
+# ------------------------------------------------------------
+# JOB DISPLAY
+# ------------------------------------------------------------
+
+def job_status_text(player, job_id):
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        return "❌ شغل پیدا نشد."
+
+    info = JOB_DEFINITIONS[job_id]
+    job = player["jobs"][job_id]
+
+    rank = get_job_rank(
+        int(job.get("xp", 0))
+    )
+
+    next_rank = get_next_job_rank(
+        int(job.get("xp", 0))
+    )
+
+    lines = []
+
+    lines.append(
+        f"{info['emoji']} <b>{info['name']}</b>"
+    )
+
+    lines.append(
+        f"📌 وضعیت: "
+        f"{'فعال' if job.get('unlocked') else 'قفل'}"
+    )
+
+    lines.append(
+        f"🏅 رتبه: {rank['name']}"
+    )
+
+    lines.append(
+        f"⭐ XP شغل: {job.get('xp', 0)}"
+    )
+
+    if next_rank:
+        remaining = (
+            next_rank["min_xp"]
+            - int(job.get("xp", 0))
+        )
+
+        lines.append(
+            f"⬆️ تا رتبه بعدی: {remaining} XP"
+        )
+
+    lines.append("")
+
+    lines.append(
+        f"👥 مشتری انجام‌شده: "
+        f"{job.get('total_customers', 0)}"
+    )
+
+    lines.append(
+        f"🧰 دفعات کار: "
+        f"{job.get('total_work', 0)}"
+    )
+
+    lines.append(
+        f"💰 درآمد کل: "
+        f"{job.get('total_income', 0):,}"
+    )
+
+    lines.append(
+        f"📉 ضرر کل: "
+        f"{job.get('total_loss', 0):,}"
+    )
+
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------
+# JOB LIST KEYBOARD
+# ------------------------------------------------------------
+
+def jobs_keyboard(user_id):
+    ensure = load_players()
+
+    buttons = []
+
+    buttons.append([
+        InlineKeyboardButton(
+            "💈 آرایشگری",
+            callback_data=f"job|barber|{user_id}"
+        )
+    ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            "🔧 مکانیکی",
+            callback_data=f"job|mechanic|{user_id}"
+        )
+    ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            "📚 آموزش و دوره‌ها",
+            callback_data=f"jobtraining|{user_id}"
+        )
+    ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            "🔙 بازگشت",
+            callback_data=f"main|{user_id}"
+        )
+    ])
+
+    return InlineKeyboardMarkup(buttons)
+
+
+# ------------------------------------------------------------
+# JOB MENU
+# ------------------------------------------------------------
+
+async def show_jobs(update, context):
+    query = update.callback_query
+
+    if query:
+        user_id = query.from_user.id
+
+        if not callback_is_owner(
+            query,
+            user_id
+        ):
+            await answer_callback(
+                query,
+                "❌ دسترسی ندارید.",
+                True
+            )
+            return
+
+        await query.answer()
+
+        text = (
+            "💼 <b>مرکز مشاغل UNDERCITY</b>\n\n"
+            "در این بخش می‌توانید شغل انتخاب کنید، "
+            "مهارت یاد بگیرید، کار کنید و رتبه خود را "
+            "از کارآموز تا استادکار افزایش دهید."
+        )
+
+        await query.edit_message_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=jobs_keyboard(user_id)
+        )
+
+
+# ------------------------------------------------------------
+# SINGLE JOB MENU KEYBOARD
+# ------------------------------------------------------------
+
+def single_job_keyboard(
+    job_id,
+    user_id
+):
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "💼 شروع کار",
+                callback_data=(
+                    f"work|{job_id}|{user_id}"
+                )
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📚 تمرین",
+                callback_data=(
+                    f"practice|{job_id}|{user_id}"
+                )
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🎓 دوره آموزشی",
+                callback_data=(
+                    f"training|{job_id}|{user_id}"
+                )
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📊 وضعیت شغل",
+                callback_data=(
+                    f"jobstats|{job_id}|{user_id}"
+                )
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔙 مشاغل",
+                callback_data=(
+                    f"jobs|{user_id}"
+                )
+            )
+        ],
+    ])
+
+
+# ------------------------------------------------------------
+# SHOW SINGLE JOB
+# ------------------------------------------------------------
+
+async def show_single_job(
+    update,
+    context,
+    job_id
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    user_id = query.from_user.id
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await answer_callback(
+            query,
+            "❌ دسترسی ندارید.",
+            True
+        )
+        return
+
+    await query.answer()
+
+    players = load_players()
+
+    key = str(user_id)
+
+    player = players.get(key)
+
+    if not player:
+        player = get_player(
+            query.from_user
+        )
+        players = load_players()
+        player = players[str(user_id)]
+
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        await query.edit_message_text(
+            "❌ شغل نامعتبر است."
+        )
+        return
+
+    text = job_status_text(
+        player,
+        job_id
+    )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=single_job_keyboard(
+            job_id,
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# WORK DURATION
+# ------------------------------------------------------------
+
+WORK_DURATIONS = {
+    "quick": {
+        "name": "⚡ شیفت کوتاه",
+        "minutes": 10,
+        "multiplier": 0.60,
+    },
+
+    "normal": {
+        "name": "🕐 شیفت عادی",
+        "minutes": 30,
+        "multiplier": 1.00,
+    },
+
+    "long": {
+        "name": "⏱ شیفت طولانی",
+        "minutes": 60,
+        "multiplier": 1.45,
+    },
+}
+
+
+# ------------------------------------------------------------
+# WORK DURATION KEYBOARD
+# ------------------------------------------------------------
+
+def work_duration_keyboard(
+    job_id,
+    user_id
+):
+
+    buttons = []
+
+    for duration_id, info in WORK_DURATIONS.items():
+
+        buttons.append([
+            InlineKeyboardButton(
+                (
+                    f"{info['name']} "
+                    f"({info['minutes']} دقیقه)"
+                ),
+                callback_data=(
+                    f"workstart|"
+                    f"{job_id}|"
+                    f"{duration_id}|"
+                    f"{user_id}"
+                )
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            "🔙 بازگشت",
+            callback_data=(
+                f"job|{job_id}|{user_id}"
+            )
+        )
+    ])
+
+    return InlineKeyboardMarkup(buttons)
+
+
+# ------------------------------------------------------------
+# SHOW WORK OPTIONS
+# ------------------------------------------------------------
+
+async def show_work_options(
+    update,
+    context,
+    job_id
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    user_id = query.from_user.id
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await answer_callback(
+            query,
+            "❌ دسترسی ندارید.",
+            True
+        )
+        return
+
+    await query.answer()
+
+    players = load_players()
+
+    player = players.get(
+        str(user_id)
+    )
+
+    if not player:
+        await query.edit_message_text(
+            "❌ اطلاعات بازیکن پیدا نشد."
+        )
+        return
+
+    ensure_jobs(player)
+
+    if not job_is_unlocked(
+        player,
+        job_id
+    ):
+        await query.edit_message_text(
+            "🔒 این شغل هنوز برای شما فعال نشده است."
+        )
+        return
+
+    info = JOB_DEFINITIONS[job_id]
+
+    text = (
+        f"{info['emoji']} <b>{info['name']}</b>\n\n"
+        "مدت شیفت را انتخاب کنید:\n\n"
+        "هرچه شیفت طولانی‌تر باشد، "
+        "مشتری و درآمد بیشتری خواهید داشت؛ "
+        "اما احتمال هزینه و خستگی نیز بیشتر می‌شود."
+    )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=work_duration_keyboard(
+            job_id,
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# WORK COOLDOWN
+# ------------------------------------------------------------
+
+WORK_COOLDOWN = 5
+
+
+def work_cooldown_remaining(
+    job,
+    now=None
+):
+
+    if now is None:
+        now = time.time()
+
+    last = float(
+        job.get(
+            "last_work",
+            0
+        )
+    )
+
+    elapsed = now - last
+
+    if elapsed >= WORK_COOLDOWN:
+        return 0
+
+    return int(
+        WORK_COOLDOWN - elapsed
+    ) + 1
+
+
+# ------------------------------------------------------------
+# CUSTOMER GENERATION
+# ------------------------------------------------------------
+
+def generate_customers(
+    job_id,
+    duration_id,
+    rank_id
+):
+
+    duration = WORK_DURATIONS[
+        duration_id
+    ]
+
+    base = {
+        "quick": 1,
+        "normal": 2,
+        "long": 3,
+    }.get(
+        duration_id,
+        1
+    )
+
+    rank_bonus = {
+        "apprentice": 0,
+        "beginner": 0,
+        "intermediate": 1,
+        "skilled": 1,
+        "professional": 2,
+        "master": 2,
+    }.get(
+        rank_id,
+        0
+    )
+
+    customers = (
+        base
+        + random.randint(0, 1)
+        + rank_bonus
+    )
+
+    max_customers = JOB_DEFINITIONS[
+        job_id
+    ]["max_customers"]
+
+    return max(
+        1,
+        min(
+            customers,
+            max_customers
+        )
+    )
+
+
+# ------------------------------------------------------------
+# JOB TASKS
+# ------------------------------------------------------------
+
+BARBER_TASKS = [
+    ("✂️ کوتاهی مو", 1.0),
+    ("💈 اصلاح صورت", 0.8),
+    ("💇 مدل‌دهی مو", 1.25),
+    ("🧴 شست‌وشوی مو", 0.7),
+    ("🎨 رنگ و فرم‌دهی", 1.40),
+]
+
+
+MECHANIC_TASKS = [
+    ("🔧 تعویض روغن", 0.8),
+    ("🛞 بررسی لاستیک", 0.7),
+    ("🔋 بررسی باتری", 0.9),
+    ("⚙️ عیب‌یابی موتور", 1.25),
+    ("🛠 تعمیر سیستم ترمز", 1.35),
+    ("🚗 سرویس کامل خودرو", 1.55),
+]
+
+
+def random_job_task(job_id):
+    if job_id == "barber":
+        return random.choice(
+            BARBER_TASKS
+        )
+
+    if job_id == "mechanic":
+        return random.choice(
+            MECHANIC_TASKS
+        )
+
+    return (
+        "🔨 کار عمومی",
+        1.0
+    )
+
+
+# ------------------------------------------------------------
+# WORK PAYMENT
+# ------------------------------------------------------------
+
+def calculate_customer_income(
+    player,
+    job_id,
+    duration_id,
+    difficulty
+):
+
+    info = JOB_DEFINITIONS[
+        job_id
+    ]
+
+    job = player["jobs"][job_id]
+
+    rank_id = job.get(
+        "rank",
+        "apprentice"
+    )
+
+    multiplier = rank_multiplier(
+        rank_id
+    )
+
+    duration_multiplier = (
+        WORK_DURATIONS[
+            duration_id
+        ]["multiplier"]
+    )
+
+    base = random.randint(
+        info["base_income"],
+        info["max_income"]
+    )
+
+    income = (
+        base
+        * multiplier
+        * duration_multiplier
+        * difficulty
+    )
+
+    # نوسان طبیعی درآمد
+    income *= random.uniform(
+        0.75,
+        1.15
+    )
+
+    return max(
+        1,
+        int(income)
+    )
+
+
+# ------------------------------------------------------------
+# WORK LOSS / EXPENSE
+# ------------------------------------------------------------
+
+def calculate_work_expense(
+    player,
+    job_id,
+    customers,
+    duration_id
+):
+
+    duration_multiplier = WORK_DURATIONS[
+        duration_id
+    ]["multiplier"]
+
+    base = {
+        "barber": 20_000,
+        "mechanic": 45_000,
+    }.get(
+        job_id,
+        20_000
+    )
+
+    expense = (
+        base
+        * customers
+        * duration_multiplier
+    )
+
+    expense *= random.uniform(
+        0.70,
+        1.30
+    )
+
+    return max(
+        0,
+        int(expense)
+    )
+
+
+# ------------------------------------------------------------
+# PERFORM WORK
+# ------------------------------------------------------------
+
+def perform_work(
+    player,
+    job_id,
+    duration_id
+):
+
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        return {
+            "success": False,
+            "message": "شغل نامعتبر است."
+        }
+
+    if duration_id not in WORK_DURATIONS:
+        return {
+            "success": False,
+            "message": "مدت شیفت نامعتبر است."
+        }
+
+    job = player["jobs"][job_id]
+
+    if not job.get("unlocked"):
+        return {
+            "success": False,
+            "message": "این شغل برای شما فعال نیست."
+        }
+
+    remaining = work_cooldown_remaining(
+        job
+    )
+
+    if remaining > 0:
+        return {
+            "success": False,
+            "message": (
+                f"⏳ کمی صبر کنید.\n"
+                f"زمان باقی‌مانده: {remaining} ثانیه"
+            )
+        }
+
+    rank_id = job.get(
+        "rank",
+        "apprentice"
+    )
+
+    customers = generate_customers(
+        job_id,
+        duration_id,
+        rank_id
+    )
+
+    income = 0
+    expense = calculate_work_expense(
+        player,
+        job_id,
+        customers,
+        duration_id
+    )
+
+    tasks = []
+
+    xp_total = 0
+
+    for _ in range(customers):
+
+        task_name, difficulty = random_job_task(
+            job_id
+        )
+
+        tasks.append(
+            (
+                task_name,
+                difficulty
+            )
+        )
+
+        customer_income = (
+            calculate_customer_income(
+                player,
+                job_id,
+                duration_id,
+                difficulty
+            )
+        )
+
+        income += customer_income
+
+        base_xp = JOB_DEFINITIONS[
+            job_id
+        ]["base_xp"]
+
+        task_xp = int(
+            base_xp
+            * difficulty
+            * WORK_DURATIONS[
+                duration_id
+            ]["multiplier"]
+        )
+
+        xp_total += max(
+            1,
+            task_xp
+        )
+
+    net = income - expense
+
+    # --------------------------------------------------------
+    # MONEY
+    # --------------------------------------------------------
+
+    old_cash = int(
+        player.get(
+            "cash",
+            0
+        )
+    )
+
+    player["cash"] = (
+        old_cash
+        + net
+    )
+
+    # --------------------------------------------------------
+    # JOB STATS
+    # --------------------------------------------------------
+
+    job["total_work"] = int(
+        job.get(
+            "total_work",
+            0
+        )
+    ) + 1
+
+    job["total_customers"] = int(
+        job.get(
+            "total_customers",
+            0
+        )
+    ) + customers
+
+    job["total_income"] = int(
+        job.get(
+            "total_income",
+            0
+        )
+    ) + income
+
+    job["total_loss"] = int(
+        job.get(
+            "total_loss",
+            0
+        )
+    ) + expense
+
+    job["last_work"] = time.time()
+
+    xp_result = add_job_xp(
+        player,
+        job_id,
+        xp_total
+    )
+
+    # --------------------------------------------------------
+    # GLOBAL XP
+    # --------------------------------------------------------
+
+    global_xp = max(
+        1,
+        int(xp_total * 0.35)
+    )
+
+    try:
+        add_xp(
+            player,
+            global_xp
+        )
+    except Exception:
+        pass
+
+    # --------------------------------------------------------
+    # TRANSACTION
+    # --------------------------------------------------------
+
+    if net >= 0:
+
+        add_transaction(
+            player,
+            "job_income",
+            net,
+            (
+                f"درآمد {JOB_DEFINITIONS[job_id]['name']} "
+                f"از {customers} مشتری"
+            ),
+            direction="in"
+        )
+
+    else:
+
+        add_transaction(
+            player,
+            "job_loss",
+            abs(net),
+            (
+                f"زیان {JOB_DEFINITIONS[job_id]['name']} "
+                f"در یک شیفت"
+            ),
+            direction="out"
+        )
+
+    return {
+        "success": True,
+        "customers": customers,
+        "income": income,
+        "expense": expense,
+        "net": net,
+        "xp": xp_total,
+        "global_xp": global_xp,
+        "tasks": tasks,
+        "promoted": xp_result["promoted"],
+        "old_rank": xp_result["old_rank"],
+        "new_rank": xp_result["new_rank"],
+    }
+
+
+# ------------------------------------------------------------
+# WORK RESULT TEXT
+# ------------------------------------------------------------
+
+def work_result_text(
+    player,
+    job_id,
+    duration_id,
+    result
+):
+
+    info = JOB_DEFINITIONS[
+        job_id
+    ]
+
+    lines = []
+
+    lines.append(
+        f"{info['emoji']} <b>گزارش شیفت</b>"
+    )
+
+    lines.append("")
+
+    lines.append(
+        f"🕐 مدت: "
+        f"{WORK_DURATIONS[duration_id]['name']}"
+    )
+
+    lines.append(
+        f"👥 مشتری: "
+        f"{result['customers']}"
+    )
+
+    lines.append("")
+
+    lines.append(
+        "📋 <b>کارهای انجام‌شده:</b>"
+    )
+
+    for task, difficulty in result["tasks"]:
+        lines.append(
+            f"• {task}"
+        )
+
+    lines.append("")
+
+    lines.append(
+        f"💰 درآمد ناخالص: "
+        f"{result['income']:,}"
+    )
+
+    lines.append(
+        f"📉 هزینه: "
+        f"{result['expense']:,}"
+    )
+
+    if result["net"] >= 0:
+        lines.append(
+            f"💵 سود خالص: "
+            f"+{result['net']:,}"
+        )
+    else:
+        lines.append(
+            f"🔻 ضرر خالص: "
+            f"{result['net']:,}"
+        )
+
+    lines.append("")
+
+    lines.append(
+        f"⭐ XP شغل: +{result['xp']}"
+    )
+
+    lines.append(
+        f"🌟 XP کلی: +{result['global_xp']}"
+    )
+
+    if result["promoted"]:
+        lines.append("")
+
+        lines.append(
+            "🎉 <b>تبریک!</b>"
+        )
+
+        lines.append(
+            f"🏅 رتبه شغلی شما ارتقا یافت:\n"
+            f"{rank_name(result['old_rank'])} "
+            f"➡️ "
+            f"{rank_name(result['new_rank'])}"
+        )
+
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------
+# WORK START CALLBACK
+# ------------------------------------------------------------
+
+async def handle_work_start_callback(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    parts = query.data.split("|")
+
+    if len(parts) != 4:
+        await query.answer(
+            "❌ درخواست نامعتبر است.",
+            show_alert=True
+        )
+        return
+
+    job_id = parts[1]
+    duration_id = parts[2]
+    user_id = int(parts[3])
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await query.answer(
+            "❌ دسترسی ندارید.",
+            show_alert=True
+        )
+        return
+
+    await query.answer(
+        "🔧 در حال انجام شیفت..."
+    )
+
+    players = load_players()
+
+    player = players.get(
+        str(user_id)
+    )
+
+    if not player:
+        await query.edit_message_text(
+            "❌ بازیکن پیدا نشد."
+        )
+        return
+
+    result = perform_work(
+        player,
+        job_id,
+        duration_id
+    )
+
+    if not result["success"]:
+        await query.edit_message_text(
+            result["message"],
+            reply_markup=single_job_keyboard(
+                job_id,
+                user_id
+            )
+        )
+        return
+
+    players[str(user_id)] = player
+
+    save_players(
+        players
+    )
+
+    text = work_result_text(
+        player,
+        job_id,
+        duration_id,
+        result
+    )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=single_job_keyboard(
+            job_id,
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# PRACTICE SYSTEM
+# ------------------------------------------------------------
+
+def practice_job(
+    player,
+    job_id
+):
+
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        return {
+            "success": False,
+            "message": "شغل نامعتبر است."
+        }
+
+    job = player["jobs"][job_id]
+
+    if not job.get("unlocked"):
+        return {
+            "success": False,
+            "message": "ابتدا این شغل را فعال کنید."
+        }
+
+    info = JOB_DEFINITIONS[
+        job_id
+    ]
+
+    cost = int(
+        info["practice_cost"]
+    )
+
+    if int(player.get("cash", 0)) < cost:
+        return {
+            "success": False,
+            "message": (
+                f"💰 برای تمرین به "
+                f"{cost:,} پول نیاز دارید."
+            )
+        }
+
+    player["cash"] -= cost
+
+    xp = int(
+        info["practice_xp"]
+        * random.uniform(
+            0.80,
+            1.20
+        )
+    )
+
+    job["practice_count"] = int(
+        job.get(
+            "practice_count",
+            0
+        )
+    ) + 1
+
+    job["last_practice"] = time.time()
+
+    xp_result = add_job_xp(
+        player,
+        job_id,
+        xp
+    )
+
+    add_transaction(
+        player,
+        "job_practice",
+        cost,
+        f"تمرین شغل {info['name']}",
+        direction="out"
+    )
+
+    try:
+        add_xp(
+            player,
+            max(1, xp // 3)
+        )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "cost": cost,
+        "xp": xp,
+        "promoted": xp_result["promoted"],
+        "old_rank": xp_result["old_rank"],
+        "new_rank": xp_result["new_rank"],
+    }
+
+
+# ------------------------------------------------------------
+# PRACTICE CALLBACK
+# ------------------------------------------------------------
+
+async def handle_practice_callback(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    parts = query.data.split("|")
+
+    if len(parts) != 3:
+        await query.answer(
+            "❌ درخواست نامعتبر.",
+            show_alert=True
+        )
+        return
+
+    job_id = parts[1]
+    user_id = int(parts[2])
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await query.answer(
+            "❌ دسترسی ندارید.",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    players = load_players()
+
+    player = players.get(
+        str(user_id)
+    )
+
+    if not player:
+        return
+
+    result = practice_job(
+        player,
+        job_id
+    )
+
+    if not result["success"]:
+
+        await query.answer(
+            result["message"],
+            show_alert=True
+        )
+        return
+
+    players[str(user_id)] = player
+
+    save_players(
+        players
+    )
+
+    text = (
+        "🏋️ <b>تمرین انجام شد</b>\n\n"
+        f"💰 هزینه: {result['cost']:,}\n"
+        f"⭐ XP شغل: +{result['xp']}\n"
+    )
+
+    if result["promoted"]:
+        text += (
+            "\n🎉 <b>ارتقای رتبه!</b>\n"
+            f"{rank_name(result['old_rank'])}"
+            f" ➡️ "
+            f"{rank_name(result['new_rank'])}"
+        )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=single_job_keyboard(
+            job_id,
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# TRAINING SYSTEM
+# ------------------------------------------------------------
+
+TRAINING_COOLDOWN = 5
+
+
+def training_job(
+    player,
+    job_id
+):
+
+    ensure_jobs(player)
+
+    if job_id not in JOB_DEFINITIONS:
+        return {
+            "success": False,
+            "message": "شغل نامعتبر است."
+        }
+
+    job = player["jobs"][job_id]
+
+    if not job.get("unlocked"):
+        return {
+            "success": False,
+            "message": "این شغل فعال نیست."
+        }
+
+    now = time.time()
+
+    last_training = float(
+        job.get(
+            "last_training",
+            0
+        )
+    )
+
+    if now - last_training < TRAINING_COOLDOWN:
+        remaining = int(
+            TRAINING_COOLDOWN
+            - (now - last_training)
+        ) + 1
+
+        return {
+            "success": False,
+            "message": (
+                f"⏳ برای دوره بعدی "
+                f"{remaining} ثانیه صبر کنید."
+            )
+        }
+
+    info = JOB_DEFINITIONS[
+        job_id
+    ]
+
+    cost = int(
+        info["training_cost"]
+    )
+
+    if int(player.get("cash", 0)) < cost:
+        return {
+            "success": False,
+            "message": (
+                f"💰 هزینه دوره "
+                f"{cost:,} است."
+            )
+        }
+
+    player["cash"] -= cost
+
+    base_xp = int(
+        info["training_xp"]
+    )
+
+    xp = random.randint(
+        int(base_xp * 0.90),
+        int(base_xp * 1.15)
+    )
+
+    job["training_count"] = int(
+        job.get(
+            "training_count",
+            0
+        )
+    ) + 1
+
+    job["last_training"] = now
+
+    xp_result = add_job_xp(
+        player,
+        job_id,
+        xp
+    )
+
+    add_transaction(
+        player,
+        "job_training",
+        cost,
+        f"دوره آموزشی {info['name']}",
+        direction="out"
+    )
+
+    try:
+        add_xp(
+            player,
+            max(1, xp // 2)
+        )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "cost": cost,
+        "xp": xp,
+        "promoted": xp_result["promoted"],
+        "old_rank": xp_result["old_rank"],
+        "new_rank": xp_result["new_rank"],
+    }
+
+
+# ------------------------------------------------------------
+# TRAINING CALLBACK
+# ------------------------------------------------------------
+
+async def handle_training_callback(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    parts = query.data.split("|")
+
+    if len(parts) != 3:
+        await query.answer(
+            "❌ درخواست نامعتبر.",
+            show_alert=True
+        )
+        return
+
+    job_id = parts[1]
+    user_id = int(parts[2])
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await query.answer(
+            "❌ دسترسی ندارید.",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    players = load_players()
+
+    player = players.get(
+        str(user_id)
+    )
+
+    if not player:
+        return
+
+    result = training_job(
+        player,
+        job_id
+    )
+
+    if not result["success"]:
+
+        await query.answer(
+            result["message"],
+            show_alert=True
+        )
+        return
+
+    players[str(user_id)] = player
+
+    save_players(
+        players
+    )
+
+    text = (
+        "🎓 <b>دوره آموزشی با موفقیت انجام شد</b>\n\n"
+        f"💰 هزینه دوره: {result['cost']:,}\n"
+        f"⭐ XP شغل: +{result['xp']}\n"
+    )
+
+    if result["promoted"]:
+        text += (
+            "\n🎉 <b>ارتقای رتبه!</b>\n"
+            f"{rank_name(result['old_rank'])}"
+            f" ➡️ "
+            f"{rank_name(result['new_rank'])}"
+        )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=single_job_keyboard(
+            job_id,
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# JOB STATS CALLBACK
+# ------------------------------------------------------------
+
+async def handle_job_stats_callback(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    parts = query.data.split("|")
+
+    if len(parts) != 3:
+        await query.answer(
+            "❌ درخواست نامعتبر.",
+            show_alert=True
+        )
+        return
+
+    job_id = parts[1]
+    user_id = int(parts[2])
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await query.answer(
+            "❌ دسترسی ندارید.",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    players = load_players()
+
+    player = players.get(
+        str(user_id)
+    )
+
+    if not player:
+        return
+
+    ensure_jobs(player)
+
+    text = job_status_text(
+        player,
+        job_id
+    )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=single_job_keyboard(
+            job_id,
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# TRAINING MENU
+# ------------------------------------------------------------
+
+def training_menu_keyboard(user_id):
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "💈 دوره آرایشگری",
+                callback_data=(
+                    f"training|barber|{user_id}"
+                )
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔧 دوره مکانیکی",
+                callback_data=(
+                    f"training|mechanic|{user_id}"
+                )
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔙 بازگشت",
+                callback_data=(
+                    f"jobs|{user_id}"
+                )
+            )
+        ],
+    ])
+
+
+async def show_training_menu(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    user_id = query.from_user.id
+
+    if not callback_is_owner(
+        query,
+        user_id
+    ):
+        await query.answer(
+            "❌ دسترسی ندارید.",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    text = (
+        "🎓 <b>مرکز آموزش UNDERCITY</b>\n\n"
+        "با گذراندن دوره‌ها می‌توانید "
+        "مهارت شغلی خود را سریع‌تر افزایش دهید.\n\n"
+        "📈 دوره‌ها XP بیشتری نسبت به تمرین "
+        "معمولی می‌دهند."
+    )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=training_menu_keyboard(
+            user_id
+        )
+    )
+
+
+# ------------------------------------------------------------
+# JOB COMMAND TEXT
+# ------------------------------------------------------------
+
+def jobs_help_text():
+
+    return (
+        "💼 <b>سیستم مشاغل UNDERCITY</b>\n\n"
+
+        "💈 <b>آرایشگری</b>\n"
+        "کوتاهی، اصلاح، مدل‌دهی و خدمات مو.\n\n"
+
+        "🔧 <b>مکانیکی</b>\n"
+        "عیب‌یابی، سرویس و تعمیر خودرو.\n\n"
+
+        "🏅 <b>رتبه‌ها</b>\n"
+        "🧹 کارآموز\n"
+        "🔧 مبتدی\n"
+        "🛠 نیمه‌ماهر\n"
+        "⚙️ ماهر\n"
+        "💼 حرفه‌ای\n"
+        "👑 استادکار\n\n"
+
+        "⭐ با کار کردن، تمرین و آموزش XP می‌گیرید.\n"
+        "هرچه رتبه بالاتر باشد، درآمد و تعداد "
+        "مشتری بیشتر می‌شود."
+    )
+
+
+# ------------------------------------------------------------
+# JOB CALLBACK ROUTER
+# ------------------------------------------------------------
+
+async def handle_job_callback(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    data = query.data
+    parts = data.split("|")
+
+    if not parts:
+        return
+
+    action = parts[0]
+
+  

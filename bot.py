@@ -1853,28 +1853,36 @@ async def withdraw_money(
 
     player = get_player(user)
 
-    amount = int(amount)
+    try:
+        amount = int(amount)
+    except (TypeError, ValueError):
+        await update.message.reply_text(
+            "❌ مبلغ نامعتبر است."
+        )
+        return
 
     if amount <= 0:
-
         await update.message.reply_text(
             "❌ مبلغ باید بیشتر از صفر باشد."
         )
-
-return
+        return
 
     if player.get(
         "bank_balance",
         0,
     ) < amount:
-
         await update.message.reply_text(
             "❌ موجودی بانک کافی نیست."
         )
-
         return
 
-    player["bank_balance"] -= amount
+    player["bank_balance"] = (
+        player.get(
+            "bank_balance",
+            0,
+        )
+        - amount
+    )
 
     player["cash"] = (
         player.get(
@@ -1903,7 +1911,6 @@ return
         f"💵 پول نقد: {player['cash']:,}\n"
         f"🏦 بانک: {player['bank_balance']:,}",
     )
-
 
 # ============================================================
 # FIND TARGET FOR TRANSFER

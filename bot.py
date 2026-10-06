@@ -21748,7 +21748,8 @@ async def handle_job_callback(
             )
         ]
 promotion = ""
-        if result["new_rank"] > result["old_rank"]:
+      
+    if result["new_rank"] > result["old_rank"]:
             promotion = (
                 "\n\n🎉 <b>تبریک!</b>\n"
                 "رتبه شغلی شما ارتقا پیدا کرد."

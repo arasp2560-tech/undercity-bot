@@ -25878,6 +25878,10 @@ def main():
     application = build_application()
 
     print(
+        "========== UNDERCITY TEST 123 =========="
+    )
+
+    print(
         "✓ Telegram application ready."
     )
 

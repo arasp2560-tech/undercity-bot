@@ -24216,7 +24216,7 @@ def instant_sell_vehicle_once(
                 "reason": "seller_not_found",
             }
 
-        ensure_vehicle_system(
+                ensure_vehicle_system(
             seller
         )
 
@@ -24230,7 +24230,8 @@ def instant_sell_vehicle_once(
                 "success": False,
                 "reason": "vehicle_not_found",
             }
-operation_id = vehicle_operation_id(
+
+        operation_id = vehicle_operation_id(
             "instant_sale",
             vehicle_id,
             seller_id
@@ -24299,8 +24300,7 @@ operation_id = vehicle_operation_id(
             "already_done": False,
             "price": price,
             "vehicle": vehicle,
-        }
-
+}
 
 # ------------------------------------------------------------
 # 15. INSTANT SELL CALLBACK

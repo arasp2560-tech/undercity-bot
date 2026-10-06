@@ -631,98 +631,28 @@ def add_transaction(
 # PLAYER CREATION
 # =========================================================
 
-def create_player(user):
+def get_player(user):
+    players = load_players()
 
-    master = is_master(user.id)
+    user_id = user.id
 
-    return {
+    player = players.get(
+        str(user_id)
+    )
 
-        "name": (
-            user.first_name
-            or "Player"
-        ),
+    if player is None:
+        player = create_player(user)
+        players[str(user_id)] = player
+        save_players(players)
+    else:
+        player = normalize_player(
+            player,
+            user
+        )
+        players[str(user_id)] = player
+        save_players(players)
 
-        "username": (
-            user.username
-            or ""
-        ),
-
-        "level": 1,
-
-        "xp": 0,
-
-        "cash": (
-            MASTER_CASH
-            if master
-            else 10_000
-        ),
-
-        "bank_balance": (
-            MASTER_BANK
-            if master
-            else 0
-        ),
-
-        "credit_score": 500,
-
-        "reputation": 0,
-
-        "banned": False,
-
-        "ban_reason": "",
-
-        "transactions": [],
-
-        "location": "پایین‌شهر",
-
-        "home": {
-            "type": "اتاق اجاره‌ای",
-            "name": "اتاق کوچک پایین‌شهر",
-            "rent": 200,
-        },
-
-        "properties": [],
-
-        "vehicles": [],
-
-        "businesses": [],
-
-        "body": default_body(),
-
-        "equipment": {
-            "clothes": "normal_clothes",
-            "armor": None,
-            "weapons": [],
-        },
-
-        "jobs": {},
-
-        "job_stats": {},
-
-        "injuries": [],
-
-        "vehicle_offers": [],
-
-        "market_listings": [],
-
-        "auctions": [],
-
-        "stats": {
-            "fights": 0,
-            "hits": 0,
-            "damage_dealt": 0,
-            "damage_received": 0,
-            "vehicles_bought": 0,
-            "vehicles_sold": 0,
-            "jobs_done": 0,
-        },
-
-        "pending_purchase": None,
-
-        "pending_action": None,
-
-        "last_actions": {},
-    }
+    return player
 
 
 def normalize_player(player, user=None):

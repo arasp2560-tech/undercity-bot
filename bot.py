@@ -25758,6 +25758,10 @@ def build_application():
         )
     )
 
+    print(
+        "UNDERCITY: CALLBACK ROUTER REGISTERED"
+    )
+
     # ----------------------------------------
     # ONE TEXT ROUTER
     # ----------------------------------------
@@ -25767,6 +25771,10 @@ def build_application():
             filters.TEXT & ~filters.COMMAND,
             final_text_router
         )
+    )
+
+    print(
+        "UNDERCITY: TEXT ROUTER REGISTERED"
     )
 
     # ----------------------------------------

@@ -25762,20 +25762,70 @@ def build_application():
         "UNDERCITY: CALLBACK ROUTER REGISTERED"
     )
 
-    # ----------------------------------------
+        # ----------------------------------------
     # ONE TEXT ROUTER
     # ----------------------------------------
+
+    async def debug_text_router(
+        update,
+        context
+    ):
+        print("=" * 60)
+        print("UNDERCITY: MESSAGE RECEIVED")
+        print(
+            "TEXT:",
+            repr(
+                update.effective_message.text
+                if update.effective_message
+                else None
+            )
+        )
+        print(
+            "USER:",
+            update.effective_user.id
+            if update.effective_user
+            else None
+        )
+        print("=" * 60)
+
+        try:
+            await final_text_router(
+                update,
+                context
+            )
+        except Exception as error:
+            import traceback
+
+            print("=" * 60)
+            print("UNDERCITY: TEXT ROUTER ERROR")
+            print("ERROR:", repr(error))
+
+            traceback.print_exception(
+                type(error),
+                error,
+                error.__traceback__,
+            )
+
+            print("=" * 60)
+
+            try:
+                await update.effective_message.reply_text(
+                    "⚠️ خطای واقعی در سیستم پیدا شد. "
+                    "لطفاً Logs را بررسی کنید."
+                )
+            except Exception:
+                pass
 
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            final_text_router
+            debug_text_router
         )
     )
 
     print(
-        "UNDERCITY: TEXT ROUTER REGISTERED"
-    )
+        "UNDERCITY: DEBUG TEXT ROUTER REGISTERED"
+)
 
     # ----------------------------------------
     # ERROR HANDLER

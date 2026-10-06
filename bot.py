@@ -17,10 +17,13 @@ import time
 import hashlib
 import copy
 import logging
+import traceback
+import html as html_module
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User
+from telegram.error import BadRequest, NetworkError, TimedOut, Forbidden
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -264,6 +267,147 @@ EQUIPMENT: dict[str, dict] = {
 }
 
 # ══════════════════════════════════════════════════════════════
+# DISTRICTS (مناطق شهر)
+# ══════════════════════════════════════════════════════════════
+
+DISTRICTS: dict[str, dict] = {
+    "downtown": {
+        "name": "🏙️ مرکز شهر",
+        "desc": "پررونق، امن‌تر، اجاره بالاتر",
+        "rent_mult": 1.4,
+        "crime": 0.2,
+        "move_cost": 500_000,
+    },
+    "south": {
+        "name": "🌆 پایین‌شهر",
+        "desc": "شروع بازی، ارزان، جرم بیشتر",
+        "rent_mult": 1.0,
+        "crime": 0.55,
+        "move_cost": 0,
+    },
+    "industrial": {
+        "name": "🏭 منطقه صنعتی",
+        "desc": "کارخانه و مکانیکی، درآمد شغلی بهتر",
+        "rent_mult": 0.9,
+        "crime": 0.4,
+        "move_cost": 300_000,
+    },
+    "port": {
+        "name": "⚓ بندر",
+        "desc": "قاچاق و تجارت دریایی (فاز بعد)",
+        "rent_mult": 1.1,
+        "crime": 0.5,
+        "move_cost": 800_000,
+    },
+    "north": {
+        "name": "🏡 شمال شهر",
+        "desc": "لوکس و آرام، برای پولدارها",
+        "rent_mult": 2.0,
+        "crime": 0.1,
+        "move_cost": 2_000_000,
+    },
+}
+
+# ══════════════════════════════════════════════════════════════
+# PROPERTIES (املاک)
+# ══════════════════════════════════════════════════════════════
+
+PROPERTY_CATALOG: dict[str, dict] = {
+    "room_south": {
+        "name": "🛏️ اتاق اجاره‌ای پایین‌شهر",
+        "district": "south",
+        "type": "rent",
+        "price": 0,
+        "rent": 150_000,
+        "level": 1,
+    },
+    "apt_south": {
+        "name": "🏢 آپارتمان کوچک پایین‌شهر",
+        "district": "south",
+        "type": "buy",
+        "price": 25_000_000,
+        "rent": 0,
+        "level": 1,
+    },
+    "apt_downtown": {
+        "name": "🏢 آپارتمان مرکز شهر",
+        "district": "downtown",
+        "type": "buy",
+        "price": 80_000_000,
+        "rent": 0,
+        "level": 3,
+    },
+    "house_north": {
+        "name": "🏠 ویلای شمال شهر",
+        "district": "north",
+        "type": "buy",
+        "price": 350_000_000,
+        "rent": 0,
+        "level": 8,
+    },
+    "shop_industrial": {
+        "name": "🏪 مغازه منطقه صنعتی",
+        "district": "industrial",
+        "type": "buy",
+        "price": 120_000_000,
+        "rent": 0,
+        "level": 5,
+        "income": 400_000,
+    },
+    "warehouse_port": {
+        "name": "📦 انبار بندر",
+        "district": "port",
+        "type": "buy",
+        "price": 200_000_000,
+        "rent": 0,
+        "level": 6,
+        "income": 600_000,
+    },
+}
+
+# ══════════════════════════════════════════════════════════════
+# TRAINING COURSES (دوره‌ها)
+# ══════════════════════════════════════════════════════════════
+
+COURSES: dict[str, dict] = {
+    "barber_basic": {
+        "name": "💈 دوره پایه آرایشگری",
+        "job": "barber",
+        "xp": 80,
+        "cost": 2_000_000,
+        "level": 1,
+    },
+    "barber_pro": {
+        "name": "💈 دوره حرفه‌ای آرایشگری",
+        "job": "barber",
+        "xp": 250,
+        "cost": 8_000_000,
+        "level": 3,
+    },
+    "mech_basic": {
+        "name": "🔧 دوره پایه مکانیکی",
+        "job": "mechanic",
+        "xp": 100,
+        "cost": 3_000_000,
+        "level": 1,
+    },
+    "mech_pro": {
+        "name": "🔧 دوره پیشرفته مکانیکی",
+        "job": "mechanic",
+        "xp": 300,
+        "cost": 12_000_000,
+        "level": 4,
+    },
+    "combat_basic": {
+        "name": "⚔️ دوره دفاع شخصی",
+        "job": None,
+        "xp_player": 40,
+        "cost": 5_000_000,
+        "level": 2,
+    },
+}
+
+# ══════════════════════════════════════════════════════════════
 # HELP PAGES
 # ══════════════════════════════════════════════════════════════
 
@@ -286,12 +430,13 @@ HELP_PAGES = [
         "text": (
             "💵 پول نقد و 🏦 حساب بانکی داری.\n\n"
             "دستورات:\n"
-            "• واریز 50000\n"
-            "• برداشت 50000\n"
-            "• انتقال پول 50000\n"
-            "• انتقال پول 50000 به @username\n\n"
+            "• واریز 1000000\n"
+            "• برداشت 500000\n"
+            "• انتقال پول 2500000\n"
+            "• انتقال پول 10000000 به @username\n\n"
+            "مبلغ سقف ثابت ندارد؛ هر عددی تا موجودی بانک.\n\n"
             "برای انتقال با ریپلای روی پیام شخص بزن و بنویس:\n"
-            "انتقال پول 50000"
+            "انتقال پول 2500000"
         ),
     },
     {
@@ -421,6 +566,36 @@ def format_num(n) -> str:
         return str(n)
 
 
+def esc(text) -> str:
+    """Escape text for Telegram HTML parse_mode."""
+    if text is None:
+        return ""
+    return html_module.escape(str(text))
+
+
+async def safe_edit_message(query, text: str, **kwargs):
+    """edit_message_text without crashing on 'Message is not modified'."""
+    try:
+        await query.edit_message_text(text, **kwargs)
+    except BadRequest as e:
+        msg = str(e).lower()
+        if "message is not modified" in msg:
+            try:
+                await query.answer()
+            except Exception:
+                pass
+            return
+        if "message to edit not found" in msg or "message can't be edited" in msg:
+            try:
+                await query.message.reply_text(text, **kwargs)
+            except Exception:
+                pass
+            return
+        raise
+    except Forbidden:
+        pass
+
+
 # ══════════════════════════════════════════════════════════════
 # PLAYER SYSTEM
 # ══════════════════════════════════════════════════════════════
@@ -456,11 +631,12 @@ def create_player(user: User) -> dict:
         "banned": False,
         "ban_reason": "",
         "loan": 0,
-        "location": "پایین‌شهر",
+        "location": "south",
         "transactions": [],
         "vehicles": [],
         "properties": [],
         "businesses": [],
+        "courses_done": [],
         "body": default_body(),
         "equipment": {
             "clothes": "normal_clothes",
@@ -510,11 +686,12 @@ def normalize_player(player: dict, user: Optional[User] = None) -> dict:
         "banned": False,
         "ban_reason": "",
         "loan": 0,
-        "location": "پایین‌شهر",
+        "location": "south",
         "transactions": [],
         "vehicles": [],
         "properties": [],
         "businesses": [],
+        "courses_done": [],
         "body": {},
         "equipment": {},
         "jobs": {},
@@ -540,9 +717,16 @@ def normalize_player(player: dict, user: Optional[User] = None) -> dict:
         "market_listings",
         "direct_deals",
         "vehicle_history",
+        "courses_done",
     ):
         if not isinstance(player.get(key), list):
             player[key] = []
+
+    # مهاجرت نام قدیمی منطقه
+    if player.get("location") in ("پایین‌شهر", "Undercity", ""):
+        player["location"] = "south"
+    if player.get("location") not in DISTRICTS:
+        player["location"] = "south"
 
     for key in ("body", "equipment", "jobs", "stats", "last_actions"):
         if not isinstance(player.get(key), dict):
@@ -815,21 +999,21 @@ def vehicle_name(vehicle: dict) -> str:
 def vehicle_details_text(vehicle: dict) -> str:
     if not vehicle:
         return "خودرو پیدا نشد."
-    name = vehicle_name(vehicle)
+    name = esc(vehicle_name(vehicle))
     lines = [
         f"🚘 <b>{name}</b>",
         "",
-        f"📅 سال: {vehicle.get('year', '-')}",
+        f"📅 سال: {esc(vehicle.get('year', '-'))}",
         f"🛣 کارکرد: {format_num(vehicle.get('mileage', 0))} km",
-        f"🔧 وضعیت: {vehicle.get('condition', '-')}",
-        f"🎨 رنگ: {vehicle.get('color', '-')}",
-        f"⚙️ موتور: {vehicle.get('engine', '-')}",
-        f"⚡ قدرت: {vehicle.get('power', '-')}",
-        f"🔄 گیربکس: {vehicle.get('transmission', '-')}",
-        f"🏁 تیونینگ: {vehicle.get('tuning', 'فابریک')}",
+        f"🔧 وضعیت: {esc(vehicle.get('condition', '-'))}",
+        f"🎨 رنگ: {esc(vehicle.get('color', '-'))}",
+        f"⚙️ موتور: {esc(vehicle.get('engine', '-'))}",
+        f"⚡ قدرت: {esc(vehicle.get('power', '-'))}",
+        f"🔄 گیربکس: {esc(vehicle.get('transmission', '-'))}",
+        f"🏁 تیونینگ: {esc(vehicle.get('tuning', 'فابریک'))}",
         f"💰 قیمت: {format_num(vehicle.get('price', 0))}",
         "",
-        f"🆔 {vehicle.get('id', '-')}",
+        f"🆔 {esc(vehicle.get('id', '-'))}",
     ]
     return "\n".join(lines)
 
@@ -886,11 +1070,22 @@ def main_menu_keyboard(user_id: int, master: bool = False) -> InlineKeyboardMark
             InlineKeyboardButton("💼 مشاغل", callback_data=f"jobs|{user_id}"),
         ],
         [
-            InlineKeyboardButton("⚔️ مبارزه", callback_data=f"combat|{user_id}"),
-            InlineKeyboardButton("🏥 کلینیک", callback_data=f"clinic|{user_id}"),
+            InlineKeyboardButton("🏠 املاک", callback_data=f"properties|{user_id}"),
+            InlineKeyboardButton("🗺️ مناطق", callback_data=f"districts|{user_id}"),
         ],
         [
+            InlineKeyboardButton("🎓 دوره‌ها", callback_data=f"courses|{user_id}"),
+            InlineKeyboardButton("⚔️ مبارزه", callback_data=f"combat|{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("🏥 کلینیک", callback_data=f"clinic|{user_id}"),
             InlineKeyboardButton("📖 راهنما", callback_data=f"help|0|{user_id}"),
+        ],
+        [
+            InlineKeyboardButton(
+                "💸 راهنمای انتقال پول",
+                callback_data=f"transfer_help|{user_id}",
+            ),
         ],
     ]
     if master:
@@ -986,1070 +1181,27 @@ def combat_menu(user_id: int) -> InlineKeyboardMarkup:
     )
 
 
-# ══════════════════════════════════════════════════════════════
-# TEXT BUILDERS
-# ══════════════════════════════════════════════════════════════
-
-
-def profile_text(player: dict) -> str:
-    name = player.get("name", "بازیکن")
-    username = player.get("username") or "ندارد"
-    if username != "ندارد" and not username.startswith("@"):
-        username = f"@{username}"
-    level = player.get("level", 1)
-    xp = player.get("xp", 0)
-    next_xp = xp_required(level)
-    body = player.get("body", {})
-    hp = body.get("hp", 100)
-    max_hp = body.get("max_hp", 100)
-    return (
-        "👤 <b>پروفایل شخصیت</b>\n\n"
-        f"🪪 نام: {name}\n"
-        f"🔹 Username: {username}\n\n"
-        f"⭐ Level: {level}\n"
-        f"📈 XP: {format_num(xp)} / {format_num(next_xp)}\n\n"
-        f"❤️ سلامت: {hp} / {max_hp}\n"
-        f"💵 پول نقد: {format_num(player.get('cash', 0))}\n"
-        f"🏦 بانک: {format_num(player.get('bank_balance', 0))}\n"
-        f"💳 اعتبار: {player.get('credit_score', 0)}\n"
-        f"⭐ شهرت: {player.get('reputation', 0)}\n\n"
-        f"🚗 خودروها: {len(player.get('vehicles', []))}\n"
-        f"🏠 املاک: {len(player.get('properties', []))}\n"
-        f"🏪 کسب‌وکارها: {len(player.get('businesses', []))}"
-    )
-
-
-def wallet_text(player: dict) -> str:
-    cash = player.get("cash", 0)
-    bank = player.get("bank_balance", 0)
-    return (
-        "💰 <b>کیف پول</b>\n\n"
-        f"💵 پول نقد:\n{format_num(cash)}\n\n"
-        f"🏦 موجودی بانک:\n{format_num(bank)}\n\n"
-        f"💎 دارایی نقدی:\n{format_num(cash + bank)}\n\n"
-        "برای واریز/برداشت بنویس:\n"
-        "واریز 50000\n"
-        "برداشت 50000"
-    )
-
-
-def transaction_text(player: dict, limit: int = 12) -> str:
-    txs = player.get("transactions", [])
-    if not txs:
-        return "📜 <b>تاریخچه تراکنش‌ها</b>\n\nهنوز تراکنشی ثبت نشده."
-    lines = ["📜 <b>تاریخچه تراکنش‌ها</b>", ""]
-    for tx in reversed(txs[-limit:]):
-        direction = tx.get("direction", "info")
-        amount = tx.get("amount", 0)
-        if direction == "in":
-            icon, amt = "🟢", f"+{format_num(amount)}"
-        elif direction == "out":
-            icon, amt = "🔴", f"-{format_num(amount)}"
-        else:
-            icon, amt = "⚪", format_num(amount)
-        lines.append(f"{icon} {amt}")
-        if tx.get("description"):
-            lines.append(f"   {tx['description']}")
-        lines.append("")
-    return "\n".join(lines)
-
-
-def help_page_text(page: int) -> str:
-    data = HELP_PAGES[page]
-    return (
-        f"{data['title']}\n\n"
-        f"{data['text']}\n\n"
-        "━━━━━━━━━━━━━━\n"
-        f"صفحه {page + 1} از {len(HELP_PAGES)}"
-    )
-
-
-# ══════════════════════════════════════════════════════════════
-# CALLBACK SAFETY
-# ══════════════════════════════════════════════════════════════
-
-
-def callback_owner_id(data: str) -> Optional[int]:
-    if not data:
-        return None
-    parts = data.split("|")
-    try:
-        return int(parts[-1])
-    except Exception:
-        return None
-
-
-def is_owner(query) -> bool:
-    owner = callback_owner_id(query.data or "")
-    if owner is None or not query.from_user:
-        return False
-    return int(owner) == int(query.from_user.id)
-
-
-async def safe_answer(query, text: Optional[str] = None, alert: bool = False):
-    try:
-        if text:
-            await query.answer(text, show_alert=alert)
-        else:
-            await query.answer()
-    except Exception:
-        pass
-
-
-# ══════════════════════════════════════════════════════════════
-# COMMANDS
-# ══════════════════════════════════════════════════════════════
-
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user:
-        return
-    player = get_player(user)
-    if player.get("banned"):
-        await update.message.reply_text(
-            f"🚫 حساب شما مسدود است.\n\nدلیل: {player.get('ban_reason', 'بدون توضیح')}"
-        )
-        return
-
-    title = "👑 MASTER" if is_master(user.id) else "🏙️ UNDERCITY"
-    name = player.get("name", user.first_name or "بازیکن")
+# ══════════════════
+async def show_transfer_help(query, user_id: int):
     text = (
-        f"{title}\n\n"
-        f"درود {name} 👋\n\n"
-        "به دنیای UNDERCITY خوش آمدی.\n\n"
-        "اینجا می‌توانی پول دربیاوری، شغل داشته باشی، "
-        "خودرو بخری، مبارزه کنی و شخصیت خودت را توسعه بدهی.\n\n"
-        "💡 برای منوی اصلی بنویس:\n"
-        "• منو\n"
-        "• menu\n\n"
-        "📖 راهنما: /help"
+        "💸 <b>راهنمای انتقال پول</b>\n\n"
+        "روش ۱ — ریپلای:\n"
+        "روی پیام بازیکن ریپلای کن و بنویس:\n"
+        "<code>انتقال پول 2500000</code>\n\n"
+        "روش ۲ — یوزرنیم:\n"
+        "<code>انتقال پول 10000000 به @username</code>\n\n"
+        "مبلغ محدودیت ثابت ندارد.\n"
+        "⚠️ پول از <b>حساب بانکی</b> کم می‌شود.\n"
+        "اگر بانک خالی است اول واریز کن:\n"
+        "<code>واریز 1000000</code>\n\n"
+        "⚔️ مبارزه: روی پیام شخص ریپلای کن و بنویس:\n"
+        "<code>ریپ</code>"
     )
-    await update.message.reply_text(text)
-
-
-async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user:
-        return
-    player = get_player(user)
-    if player.get("banned"):
-        await update.message.reply_text("🚫 حساب شما مسدود است.")
-        return
-    await update.message.reply_text(
-        "🏙️ <b>منوی اصلی UNDERCITY</b>\n\nیکی از بخش‌ها را انتخاب کن:",
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(user.id, is_master(user.id)),
-    )
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user:
-        return
-    player = get_player(user)
-    if player.get("banned"):
-        await update.message.reply_text("🚫 حساب شما مسدود است.")
-        return
-    await update.message.reply_text(
-        help_page_text(0),
-        reply_markup=help_keyboard(user.id, 0),
-    )
-
-
-async def jobs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user:
-        return
-    player = get_player(user)
-    if player.get("banned"):
-        await update.message.reply_text("🚫 حساب شما مسدود است.")
-        return
-    await update.message.reply_text(
-        "💼 <b>مرکز مشاغل</b>\n\nیک شغل انتخاب کن و کار کن.",
-        parse_mode="HTML",
-        reply_markup=jobs_menu(user.id),
-    )
-
-
-async def cars_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user:
-        return
-    player = get_player(user)
-    if player.get("banned"):
-        await update.message.reply_text("🚫 حساب شما مسدود است.")
-        return
-    await update.message.reply_text(
-        f"🚘 <b>مرکز خودرو</b>\n\nتعداد خودروهای شما: {len(player.get('vehicles', []))}",
-        parse_mode="HTML",
-        reply_markup=vehicles_menu(user.id),
-    )
-
-
-async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user or not is_master(user.id):
-        await update.message.reply_text("❌ این دستور فقط برای Master است.")
-        return
-    await show_master_panel(update, context)
-
-
-# ══════════════════════════════════════════════════════════════
-# SHOW HELPERS (callback + message)
-# ══════════════════════════════════════════════════════════════
-
-
-async def show_main_menu(query, user_id: int):
-    await query.edit_message_text(
-        "🏙️ <b>منوی اصلی UNDERCITY</b>\n\nیکی از بخش‌ها را انتخاب کن:",
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(user_id, is_master(user_id)),
-    )
-
-
-async def show_profile(query, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    await query.edit_message_text(
-        profile_text(player),
+    await safe_edit_message(
+        query,
+        text,
         parse_mode="HTML",
         reply_markup=back_button(user_id, "main"),
-    )
-
-
-async def show_wallet(query, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    await query.edit_message_text(
-        wallet_text(player),
-        parse_mode="HTML",
-        reply_markup=wallet_menu(user_id),
-    )
-
-
-async def show_transactions(query, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    await query.edit_message_text(
-        transaction_text(player),
-        parse_mode="HTML",
-        reply_markup=back_button(user_id, "wallet"),
-    )
-
-
-# ══════════════════════════════════════════════════════════════
-# VEHICLE ACTIONS
-# ══════════════════════════════════════════════════════════════
-
-
-async def show_showroom(query, user_id: int):
-    rows = []
-    for cid, v in VEHICLE_CATALOG.items():
-        name = f"{v.get('brand', '')} {v.get('model', '')}"
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    f"🚗 {name} — {format_num(v.get('price', 0))}",
-                    callback_data=f"showcar|{cid}|{user_id}",
-                )
-            ]
-        )
-    rows.append([InlineKeyboardButton("🔙 خودروها", callback_data=f"vehicles|{user_id}")])
-    await query.edit_message_text(
-        "🏢 <b>نمایشگاه خودرو</b>\n\nخودروی موردنظر را انتخاب کن:",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(rows),
-    )
-
-
-async def show_catalog_vehicle(query, catalog_id: str, user_id: int):
-    catalog = VEHICLE_CATALOG.get(str(catalog_id))
-    if not catalog:
-        await safe_answer(query, "خودرو پیدا نشد.", True)
-        return
-    text = vehicle_details_text({**catalog, "id": f"catalog-{catalog_id}"})
-    kb = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "💳 خرید خودرو",
-                    callback_data=f"buycar|{catalog_id}|{user_id}",
-                )
-            ],
-            [
-                InlineKeyboardButton("🔙 نمایشگاه", callback_data=f"showroom|{user_id}"),
-                InlineKeyboardButton("🚗 خودروها", callback_data=f"vehicles|{user_id}"),
-            ],
-        ]
-    )
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
-
-
-def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]:
-    with DATA_LOCK:
-        players = load_players()
-        key = str(buyer_id)
-        if key not in players:
-            return False, "حساب پیدا نشد."
-
-        buyer = normalize_player(players[key])
-        if buyer.get("banned"):
-            return False, "حساب شما مسدود است."
-
-        catalog = VEHICLE_CATALOG.get(str(catalog_id))
-        if not catalog:
-            return False, "خودرو پیدا نشد."
-
-        price = int(catalog.get("price", 0))
-        if price <= 0:
-            return False, "قیمت نامعتبر است."
-        if buyer.get("bank_balance", 0) < price:
-            return False, "موجودی بانک کافی نیست."
-
-        ref = make_id("PUR")
-        # جلوگیری از خرید تکراری با همان reference (idempotency ساده)
-        for tx in buyer.get("transactions", []):
-            if tx.get("reference_id") == ref:
-                return False, "این خرید قبلاً انجام شده."
-
-        buyer["bank_balance"] -= price
-        vehicle = create_vehicle_from_catalog(catalog_id, buyer_id)
-        vehicle["purchase_price"] = price
-        vehicle["purchase_reference"] = ref
-        buyer.setdefault("vehicles", []).append(vehicle)
-        buyer["stats"]["vehicles_bought"] = buyer["stats"].get("vehicles_bought", 0) + 1
-
-        add_transaction(
-            buyer,
-            "vehicle_purchase",
-            price,
-            f"خرید {vehicle_name(vehicle)}",
-            direction="out",
-            reference_id=ref,
-        )
-
-        # فروش به Master (اگر خریدار Master نباشد)
-        if int(buyer_id) != MASTER_USER_ID:
-            m_key = str(MASTER_USER_ID)
-            if m_key not in players:
-                # ساخت حساب master ساده
-                players[m_key] = {
-                    "name": "Master",
-                    "username": "",
-                    "level": 99,
-                    "xp": 0,
-                    "cash": MASTER_CASH,
-                    "bank_balance": MASTER_BANK,
-                    "transactions": [],
-                    "vehicles": [],
-                    "banned": False,
-                    "stats": {},
-                    "body": default_body(),
-                    "equipment": {},
-                    "jobs": {},
-                }
-            master = normalize_player(players[m_key])
-            master["bank_balance"] = master.get("bank_balance", 0) + price
-            add_transaction(
-                master,
-                "vehicle_sale",
-                price,
-                f"فروش {vehicle_name(vehicle)} به {buyer_id}",
-                direction="in",
-                reference_id=ref,
-            )
-            players[m_key] = master
-
-        players[key] = buyer
-        save_players(players)
-        return True, {"vehicle": vehicle, "price": price, "buyer": buyer}
-
-
-async def buy_vehicle(query, catalog_id: str, user_id: int):
-    success, result = execute_vehicle_purchase(user_id, catalog_id)
-    if not success:
-        await safe_answer(query, str(result), True)
-        return
-    vehicle = result["vehicle"]
-    price = result["price"]
-    await safe_answer(query, "✅ خودرو خریداری شد.")
-    await query.edit_message_text(
-        "✅ <b>خرید موفق</b>\n\n"
-        f"🚗 {vehicle_name(vehicle)}\n"
-        f"💰 قیمت: {format_num(price)}\n"
-        f"🆔 {vehicle.get('id')}\n\n"
-        "خودرو به گاراژ شما اضافه شد.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("🚗 گاراژ من", callback_data=f"garage|{user_id}")],
-                [InlineKeyboardButton("🏙️ منوی اصلی", callback_data=f"main|{user_id}")],
-            ]
-        ),
-    )
-
-
-async def show_garage(query, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    vehicles = player.get("vehicles", [])
-    if not vehicles:
-        await query.edit_message_text(
-            "🚗 <b>گاراژ من</b>\n\nگاراژ شما خالی است.\nاز نمایشگاه می‌توانی خودرو بخری.",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("🏪 نمایشگاه", callback_data=f"showroom|{user_id}")],
-                    [InlineKeyboardButton("🔙 خودروها", callback_data=f"vehicles|{user_id}")],
-                ]
-            ),
-        )
-        return
-
-    lines = [f"🚗 <b>گاراژ من</b>\n\nتعداد: {len(vehicles)}\n"]
-    rows = []
-    for i, v in enumerate(vehicles, 1):
-        lines.append(
-            f"{i}. {vehicle_name(v)}\n   🆔 {v.get('id')}\n   💰 {format_num(v.get('price', 0))}\n"
-        )
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    f"🚘 {vehicle_name(v)[:28]}",
-                    callback_data=f"mycar|{v.get('id')}|{user_id}",
-                )
-            ]
-        )
-    rows.append([InlineKeyboardButton("🔙 خودروها", callback_data=f"vehicles|{user_id}")])
-    await query.edit_message_text(
-        "\n".join(lines),
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(rows),
-    )
-
-
-async def show_my_vehicle(query, vehicle_id: str, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    vehicle = get_vehicle_by_id(player, vehicle_id)
-    if not vehicle:
-        await safe_answer(query, "این خودرو در گاراژ شما نیست.", True)
-        return
-    text = vehicle_details_text(vehicle) + "\n\n📌 وضعیت: متعلق به شما"
-    kb = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "💰 فروش فوری",
-                    callback_data=f"sellcar|{vehicle_id}|{user_id}",
-                ),
-                InlineKeyboardButton(
-                    "🏷 آگهی بازار",
-                    callback_data=f"listcar|{vehicle_id}|{user_id}",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    "🎁 انتقال / هدیه",
-                    callback_data=f"giftcar|{vehicle_id}|{user_id}",
-                ),
-            ],
-            [InlineKeyboardButton("🔙 گاراژ", callback_data=f"garage|{user_id}")],
-        ]
-    )
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
-
-
-def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
-    with DATA_LOCK:
-        players = load_players()
-        key = str(seller_id)
-        if key not in players:
-            return False, "حساب پیدا نشد."
-        seller = normalize_player(players[key])
-        vehicle = get_vehicle_by_id(seller, vehicle_id)
-        if not vehicle:
-            return False, "خودرو در گاراژ نیست."
-        price = int(vehicle.get("price", 0))
-        if price <= 0:
-            return False, "قیمت نامعتبر است."
-
-        op_id = hashlib.sha256(
-            f"instant_sale:{vehicle_id}:{seller_id}".encode()
-        ).hexdigest()[:24]
-        for h in seller.get("vehicle_history", []):
-            if h.get("operation_id") == op_id:
-                return True, {"already_done": True, "price": price}
-
-        if not remove_vehicle(seller, vehicle_id):
-            return False, "حذف خودرو ناموفق بود."
-
-        # فروش فوری با ۸۰٪ قیمت
-        sale_price = max(1, int(price * 0.8))
-        seller["bank_balance"] = seller.get("bank_balance", 0) + sale_price
-        seller["stats"]["vehicles_sold"] = seller["stats"].get("vehicles_sold", 0) + 1
-
-        seller.setdefault("vehicle_history", []).append(
-            {
-                "operation_id": op_id,
-                "type": "instant_sale",
-                "vehicle_id": vehicle_id,
-                "timestamp": timestamp(),
-            }
-        )
-        seller["vehicle_history"] = seller["vehicle_history"][-200:]
-
-        add_transaction(
-            seller,
-            "vehicle_sale",
-            sale_price,
-            f"فروش فوری {vehicle_name(vehicle)}",
-            direction="in",
-            reference_id=op_id,
-        )
-        players[key] = seller
-        save_players(players)
-        return True, {"price": sale_price, "vehicle": vehicle, "already_done": False}
-
-
-async def sell_car_instant(query, vehicle_id: str, user_id: int):
-    success, result = execute_instant_sell(user_id, vehicle_id)
-    if not success:
-        await safe_answer(query, str(result), True)
-        return
-    if result.get("already_done"):
-        await safe_answer(query, "این فروش قبلاً انجام شده.", True)
-        return
-    await safe_answer(query, "✅ فروخته شد.")
-    await query.edit_message_text(
-        f"✅ <b>فروش موفق</b>\n\n💰 مبلغ: {format_num(result['price'])}\n"
-        "خودرو از گاراژ حذف شد.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("🚗 گاراژ", callback_data=f"garage|{user_id}")],
-                [InlineKeyboardButton("🔙 خودروها", callback_data=f"vehicles|{user_id}")],
-            ]
-        ),
-    )
-
-
-async def prepare_list_car(query, vehicle_id: str, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    vehicle = get_vehicle_by_id(player, vehicle_id)
-    if not vehicle:
-        await safe_answer(query, "خودرو پیدا نشد.", True)
-        return
-    player["pending"] = {
-        "type": "list_vehicle",
-        "vehicle_id": vehicle_id,
-        "created_at": time.time(),
-    }
-    save_player(user_id, player)
-    await query.edit_message_text(
-        f"🏷 <b>ثبت آگهی</b>\n\n"
-        f"🚗 {vehicle_name(vehicle)}\n\n"
-        "قیمت فروش را ارسال کن.\n\n"
-        "مثال:\nفروش خودرو 500000000\n\n"
-        "برای لغو: لغو",
-        parse_mode="HTML",
-    )
-
-
-async def prepare_gift_car(query, vehicle_id: str, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    vehicle = get_vehicle_by_id(player, vehicle_id)
-    if not vehicle:
-        await safe_answer(query, "خودرو پیدا نشد.", True)
-        return
-    player["pending"] = {
-        "type": "gift_vehicle",
-        "vehicle_id": vehicle_id,
-        "created_at": time.time(),
-    }
-    save_player(user_id, player)
-    await query.edit_message_text(
-        f"🎁 <b>انتقال خودرو</b>\n\n"
-        f"🚗 {vehicle_name(vehicle)}\n\n"
-        "شناسه عددی یا @username گیرنده را ارسال کن.\n\n"
-        "مثال:\nانتقال خودرو به 123456789\n"
-        "یا:\nانتقال خودرو به @username\n\n"
-        "برای لغو: لغو",
-        parse_mode="HTML",
-    )
-
-
-# ══════════════════════════════════════════════════════════════
-# JOB SYSTEM
-# ══════════════════════════════════════════════════════════════
-
-
-def job_rank_from_xp(xp: int) -> int:
-    xp = max(0, int(xp))
-    rank = 0
-    for i, thr in enumerate(JOB_RANK_THRESHOLDS):
-        if xp >= thr:
-            rank = i
-    return min(rank, 5)
-
-
-def ensure_job(player: dict, job_key: str) -> dict:
-    jobs = player.setdefault("jobs", {})
-    if job_key not in jobs or not isinstance(jobs[job_key], dict):
-        jobs[job_key] = {
-            "xp": 0,
-            "rank": 0,
-            "sessions": 0,
-            "income": 0,
-            "loss": 0,
-            "customers": 0,
-        }
-    data = jobs[job_key]
-    for k in ("xp", "rank", "sessions", "income", "loss", "customers"):
-        data.setdefault(k, 0)
-    return data
-
-
-def run_job_session(player: dict, job_key: str) -> dict:
-    job = JOBS[job_key]
-    data = ensure_job(player, job_key)
-    old_rank = int(data.get("rank", 0))
-    rank = max(old_rank, job_rank_from_xp(data.get("xp", 0)))
-    data["rank"] = rank
-
-    customers = random.randint(1, 3) + (rank // 2)
-    income = 0
-    loss = 0
-    xp_gain = 0
-    base = job["base_income"]
-
-    for _ in range(customers):
-        job_income = int(base * random.uniform(0.85, 1.35))
-        fail_chance = max(3, 16 - rank * 2)
-        if random.randint(1, 100) <= fail_chance:
-            mistake = max(5_000, job_income // 5)
-            loss += mistake
-            xp_gain += max(4, job["base_xp"] // 2)
-        else:
-            income += job_income
-            xp_gain += job["base_xp"] + rank * 3
-
-    net = income - loss
-    player["cash"] = max(0, int(player.get("cash", 0)) + net)
-    data["sessions"] += 1
-    data["customers"] += customers
-    data["income"] += income
-    data["loss"] += loss
-    data["xp"] += xp_gain
-    data["rank"] = max(data["rank"], job_rank_from_xp(data["xp"]))
-    player["stats"]["jobs_done"] = player["stats"].get("jobs_done", 0) + 1
-    add_xp(player, xp_gain // 2)
-    add_transaction(
-        player,
-        "job_income",
-        max(0, net),
-        f"درآمد {job['name']} ({customers} مشتری)",
-        direction="in" if net >= 0 else "out",
-    )
-    return {
-        "customers": customers,
-        "income": income,
-        "loss": loss,
-        "net": net,
-        "xp": xp_gain,
-        "old_rank": old_rank,
-        "new_rank": data["rank"],
-    }
-
-
-async def handle_job_action(query, parts: list):
-    user_id = int(parts[-1])
-    if not is_owner(query):
-        await safe_answer(query, "دسترسی ندارید.", True)
-        return
-    player = get_player(query.from_user)
-    action = parts[0]
-
-    if action == "jobs":
-        await query.edit_message_text(
-            "💼 <b>مشاغل</b>\n\nیک شغل انتخاب کن.",
-            parse_mode="HTML",
-            reply_markup=jobs_menu(user_id),
-        )
-        return
-
-    if action == "job_skills":
-        lines = ["📊 <b>مهارت‌های شغلی</b>\n"]
-        for jkey, jdata in JOBS.items():
-            d = ensure_job(player, jkey)
-            rank = min(int(d.get("rank", 0)), 5)
-            lines.append(
-                f"{jdata['name']}\n"
-                f"🎖 {jdata['ranks'][rank]}\n"
-                f"⭐ {format_num(d.get('xp', 0))} XP\n"
-            )
-        await query.edit_message_text(
-            "\n".join(lines),
-            parse_mode="HTML",
-            reply_markup=back_button(user_id, "jobs"),
-        )
-        return
-
-    if action == "job":
-        job_key = parts[1] if len(parts) > 2 else "barber"
-        if job_key not in JOBS:
-            job_key = "barber"
-        data = ensure_job(player, job_key)
-        rank = min(int(data.get("rank", 0)), 5)
-        j = JOBS[job_key]
-        text = (
-            f"{j['name']}\n\n"
-            f"🎖 رتبه: {j['ranks'][rank]}\n"
-            f"⭐ XP شغلی: {format_num(data.get('xp', 0))}\n"
-            f"👥 مشتری‌ها: {format_num(data.get('customers', 0))}\n"
-            f"💰 درآمد کل: {format_num(data.get('income', 0))}\n"
-            f"📉 خسارت کل: {format_num(data.get('loss', 0))}\n"
-            f"🧰 جلسات: {format_num(data.get('sessions', 0))}"
-        )
-        kb = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "▶️ شروع کار",
-                        callback_data=f"job_work|{job_key}|{user_id}",
-                    )
-                ],
-                [InlineKeyboardButton("🔙 مشاغل", callback_data=f"jobs|{user_id}")],
-            ]
-        )
-        await query.edit_message_text(text, reply_markup=kb)
-        return
-
-    if action == "job_work":
-        job_key = parts[1] if len(parts) > 2 else "barber"
-        if job_key not in JOBS:
-            await safe_answer(query, "شغل نامعتبر.", True)
-            return
-        result = run_job_session(player, job_key)
-        save_player(user_id, player)
-        rank_name = JOBS[job_key]["ranks"][min(result["new_rank"], 5)]
-        promo = ""
-        if result["new_rank"] > result["old_rank"]:
-            promo = "\n\n🎉 <b>تبریک!</b> رتبه شغلی ارتقا یافت."
-        text = (
-            f"💼 <b>شیفت کاری تمام شد</b>\n\n"
-            f"👥 مشتری: {result['customers']}\n"
-            f"💰 درآمد: +{format_num(result['income'])}\n"
-            f"📉 خسارت: -{format_num(result['loss'])}\n"
-            f"💵 خالص: {result['net']:+,}\n"
-            f"⭐ XP شغلی: +{result['xp']}\n"
-            f"🎖 رتبه: {rank_name}"
-            f"{promo}"
-        )
-        await query.edit_message_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            "🔄 یک شیفت دیگر",
-                            callback_data=f"job_work|{job_key}|{user_id}",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            "🔙 شغل",
-                            callback_data=f"job|{job_key}|{user_id}",
-                        )
-                    ],
-                ]
-            ),
-        )
-
-
-# ══════════════════════════════════════════════════════════════
-# COMBAT
-# ══════════════════════════════════════════════════════════════
-
-
-def body_status_text(player: dict) -> str:
-    body = player.get("body", default_body())
-    lines = [
-        "⚔️ <b>وضعیت بدن</b>",
-        "",
-        f"❤️ HP کلی: {body.get('hp', 100)}/{body.get('max_hp', 100)}",
-        "",
-        "🩸 آسیب‌ها:",
-    ]
-    injuries = body.get("injuries", [])
-    if not injuries:
-        lines.append("هیچ آسیب فعالی نداری.")
-    else:
-        for inj in injuries:
-            itype = INJURY_TYPES.get(inj.get("type", "bruise"), {})
-            part = BODY_PARTS.get(inj.get("part", ""), {}).get("name", inj.get("part"))
-            lines.append(f"• {itype.get('name', '?')} در {part}")
-    return "\n".join(lines)
-
-
-async def start_fight_from_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    msg = update.message
-    if not user or not msg or not msg.reply_to_message:
-        return
-    target = msg.reply_to_message.from_user
-    if not target:
-        await msg.reply_text("❌ صاحب پیام شناسایی نشد.")
-        return
-    if target.id == user.id:
-        await msg.reply_text("❌ نمی‌توانی با خودت مبارزه کنی.")
-        return
-    if target.is_bot:
-        await msg.reply_text("❌ نمی‌توانی با ربات مبارزه کنی.")
-        return
-
-    attacker = get_player(user)
-    if attacker.get("banned"):
-        await msg.reply_text("🚫 حساب شما مسدود است.")
-        return
-    # اطمینان از وجود حساب هدف
-    get_player(target)
-
-    rows = []
-    for aid, atk in ATTACKS.items():
-        if attacker.get("level", 1) >= atk.get("level", 1):
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        f"{atk['name']} (Lv.{atk.get('level', 1)})",
-                        callback_data=f"attacktype|{aid}|{target.id}|{user.id}",
-                    )
-                ]
-            )
-    rows.append(
-        [InlineKeyboardButton("❌ لغو", callback_data=f"fightcancel|{user.id}")]
-    )
-    await msg.reply_text(
-        f"⚔️ مبارزه با {target.first_name or 'بازیکن'}\n\nنوع حمله را انتخاب کن:",
-        reply_markup=InlineKeyboardMarkup(rows),
-    )
-
-
-async def handle_attack_type(query, attack_id: str, target_id: int, attacker_id: int):
-    if int(query.from_user.id) != int(attacker_id):
-        await safe_answer(query, "این دکمه متعلق به شما نیست.", True)
-        return
-    if attack_id not in ATTACKS:
-        await safe_answer(query, "حمله نامعتبر.", True)
-        return
-    rows = []
-    current = []
-    for pid, pdata in BODY_PARTS.items():
-        current.append(
-            InlineKeyboardButton(
-                pdata["name"],
-                callback_data=f"attackpart|{attack_id}|{pid}|{target_id}|{attacker_id}",
-            )
-        )
-        if len(current) == 2:
-            rows.append(current)
-            current = []
-    if current:
-        rows.append(current)
-    rows.append(
-        [InlineKeyboardButton("❌ لغو", callback_data=f"fightcancel|{attacker_id}")]
-    )
-    await query.edit_message_text(
-        f"{ATTACKS[attack_id]['name']}\n\nقسمت بدن را انتخاب کن:",
-        reply_markup=InlineKeyboardMarkup(rows),
-    )
-
-
-async def handle_attack_part(
-    query, attack_id: str, part_id: str, target_id: int, attacker_id: int, context
-):
-    if int(query.from_user.id) != int(attacker_id):
-        await safe_answer(query, "دسترسی ندارید.", True)
-        return
-    if attack_id not in ATTACKS or part_id not in BODY_PARTS:
-        await safe_answer(query, "داده نامعتبر.", True)
-        return
-
-    with DATA_LOCK:
-        players = load_players()
-        a_key, t_key = str(attacker_id), str(target_id)
-        if a_key not in players or t_key not in players:
-            await safe_answer(query, "بازیکن پیدا نشد.", True)
-            return
-        attacker = normalize_player(players[a_key])
-        target = normalize_player(players[t_key])
-
-        atk = ATTACKS[attack_id]
-        if attacker.get("level", 1) < atk.get("level", 1):
-            await safe_answer(query, "سطح شما کافی نیست.", True)
-            return
-
-        # دقت
-        if random.randint(1, 100) > atk["accuracy"]:
-            await query.edit_message_text(
-                f"💨 حمله {atk['name']} به خطا رفت!",
-                reply_markup=back_button(attacker_id, "combat"),
-            )
-            return
-
-        base_dmg = random.randint(atk["min"], atk["max"])
-        mult = BODY_PARTS[part_id]["multiplier"]
-        damage = max(1, int(base_dmg * mult))
-
-        # اعمال آسیب
-        body = target.setdefault("body", default_body())
-        parts = body.setdefault("parts", {})
-        if part_id not in parts:
-            parts[part_id] = {
-                "hp": BODY_PARTS[part_id]["max_hp"],
-                "max_hp": BODY_PARTS[part_id]["max_hp"],
-            }
-        parts[part_id]["hp"] = max(0, parts[part_id]["hp"] - damage)
-        body["hp"] = max(0, body.get("hp", 100) - max(1, damage // 3))
-
-        # احتمال آسیب
-        injury = None
-        roll = random.randint(1, 100)
-        if roll <= 8 and damage >= 18:
-            injury = "fracture"
-        elif roll <= 18 and damage >= 14:
-            injury = "dislocation"
-        elif roll <= 30 and damage >= 12:
-            injury = "bleeding"
-        elif roll <= 50 and damage >= 8:
-            injury = "wound"
-        elif roll <= 70:
-            injury = "bruise"
-
-        if injury:
-            body.setdefault("injuries", []).append(
-                {
-                    "type": injury,
-                    "part": part_id,
-                    "created_at": timestamp(),
-                }
-            )
-            body["injuries"] = body["injuries"][-20:]
-
-        attacker["stats"]["fights"] = attacker["stats"].get("fights", 0) + 1
-        attacker["stats"]["hits"] = attacker["stats"].get("hits", 0) + 1
-        attacker["stats"]["damage_dealt"] = (
-            attacker["stats"].get("damage_dealt", 0) + damage
-        )
-        target["stats"]["damage_received"] = (
-            target["stats"].get("damage_received", 0) + damage
-        )
-        add_xp(attacker, atk["xp"])
-
-        players[a_key] = attacker
-        players[t_key] = target
-        save_players(players)
-
-    part_name = BODY_PARTS[part_id]["name"]
-    inj_text = ""
-    if injury:
-        inj_text = f"\n🩸 آسیب: {INJURY_TYPES[injury]['name']}"
-
-    await query.edit_message_text(
-        f"⚔️ <b>حمله موفق</b>\n\n"
-        f"{atk['name']} به {part_name}\n"
-        f"💥 آسیب: {damage}{inj_text}",
-        parse_mode="HTML",
-        reply_markup=back_button(attacker_id, "combat"),
-    )
-
-    try:
-        await context.bot.send_message(
-            chat_id=target_id,
-            text=(
-                f"⚠️ به شما حمله شد!\n\n"
-                f"👤 مهاجم: {query.from_user.first_name or 'بازیکن'}\n"
-                f"{atk['name']} به {part_name}\n"
-                f"💥 آسیب: {damage}{inj_text}"
-            ),
-        )
-    except Exception:
-        pass
-
-
-async def show_clinic(query, user_id: int):
-    player = get_player_by_id(user_id) or get_player(query.from_user)
-    body = player.get("body", default_body())
-    injuries = body.get("injuries", [])
-    if not injuries:
-        text = "🏥 <b>کلینیک</b>\n\nآسیب فعالی نداری. سلامت کامل!"
-        kb = back_button(user_id, "combat")
-    else:
-        total_cost = 0
-        lines = ["🏥 <b>کلینیک</b>\n\nآسیب‌های فعال:\n"]
-        for inj in injuries:
-            itype = INJURY_TYPES.get(inj.get("type", "bruise"), {})
-            part = BODY_PARTS.get(inj.get("part", ""), {}).get("name", "?")
-            cost = itype.get("cost", 10000)
-            total_cost += cost
-            lines.append(f"• {itype.get('name')} در {part} — {format_num(cost)}")
-        lines.append(f"\n💰 هزینه درمان همه: {format_num(total_cost)}")
-        text = "\n".join(lines)
-        kb = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "🩹 درمان همه",
-                        callback_data=f"treat_all|{user_id}",
-                    )
-                ],
-                [InlineKeyboardButton("🔙 مبارزه", callback_data=f"combat|{user_id}")],
-            ]
-        )
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
-
-
-async def treat_all(query, user_id: int):
-    with DATA_LOCK:
-        players = load_players()
-        key = str(user_id)
-        if key not in players:
-            await safe_answer(query, "حساب پیدا نشد.", True)
-            return
-        player = normalize_player(players[key])
-        body = player.get("body", default_body())
-        injuries = body.get("injuries", [])
-        if not injuries:
-            await safe_answer(query, "آسیبی برای درمان نیست.")
-            return
-        total = 0
-        for inj in injuries:
-            total += INJURY_TYPES.get(inj.get("type", "bruise"), {}).get("cost", 10000)
-        if player.get("bank_balance", 0) < total and player.get("cash", 0) < total:
-            await safe_answer(query, "پول کافی نیست.", True)
-            return
-        if player.get("bank_balance", 0) >= total:
-            player["bank_balance"] -= total
-        else:
-            player["cash"] -= total
-
-        # درمان
-        body["injuries"] = []
-        body["hp"] = body.get("max_hp", 100)
-        for pid, pdata in BODY_PARTS.items():
-            if pid in body.get("parts", {}):
-                body["parts"][pid]["hp"] = pdata["max_hp"]
-        player["body"] = body
-        add_transaction(
-            player,
-            "clinic",
-            total,
-            "درمان کامل در کلینیک",
-            direction="out",
-        )
-        players[key] = player
-        save_players(players)
-
-    await query.edit_message_text(
-        f"✅ درمان کامل انجام شد.\n💰 هزینه: {format_num(total)}",
-        reply_markup=back_button(user_id, "combat"),
     )
 
 
@@ -2151,9 +1303,10 @@ async def handle_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE, te
     if not match:
         await update.message.reply_text(
             "❌ فرمت صحیح:\n"
-            "انتقال پول 50000\n"
-            "یا:\nانتقال پول 50000 به @username\n\n"
-            "یا روی پیام شخص ریپلای کن و بنویس:\nانتقال پول 50000"
+            "انتقال پول 2500000\n"
+            "یا:\nانتقال پول 10000000 به @username\n\n"
+            "مبلغ سقف ثابت ندارد.\n"
+            "یا روی پیام شخص ریپلای کن و بنویس:\nانتقال پول 2500000"
         )
         return
 
@@ -2359,7 +1512,13 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         return
 
-    player = get_player(user)
+    try:
+        player = get_player(user)
+    except Exception as e:
+        logger.exception("get_player failed: %s", e)
+        await update.message.reply_text("⚠️ خطا در بارگذاری حساب. دوباره /start بزن.")
+        return
+
     if player.get("banned"):
         await update.message.reply_text("🚫 حساب شما مسدود است.")
         return
@@ -2413,13 +1572,8 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # انتقال پول
-    if text.startswith("انتقال پول") or text.startswith("انتقال\s+پول"):
+    if text.startswith("انتقال پول"):
         await handle_transfer(update, context, text)
-        return
-
-    # Master commands
-    if is_master(user.id) and text.startswith("/"):
-        await handle_master_commands(update, context, text)
         return
 
     await update.message.reply_text(
@@ -2427,84 +1581,116 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def handle_master_commands(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    parts = text.split()
-    cmd = parts[0].lower()
+async def _require_master(update: Update) -> bool:
+    user = update.effective_user
+    if not user or not is_master(user.id):
+        if update.message:
+            await update.message.reply_text("❌ فقط برای Master.")
+        return False
+    return True
 
-    if cmd == "/ban" and len(parts) >= 2:
-        try:
-            uid = int(parts[1])
-            reason = " ".join(parts[2:]) or "بدون توضیح"
-            players = load_players()
-            if str(uid) not in players:
-                await update.message.reply_text("بازیکن پیدا نشد.")
-                return
-            players[str(uid)]["banned"] = True
-            players[str(uid)]["ban_reason"] = reason
-            save_players(players)
-            await update.message.reply_text(f"✅ کاربر {uid} بن شد.\nدلیل: {reason}")
-        except Exception as e:
-            await update.message.reply_text(f"خطا: {e}")
+
+async def master_ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
         return
-
-    if cmd == "/unban" and len(parts) >= 2:
-        try:
-            uid = int(parts[1])
-            players = load_players()
-            if str(uid) not in players:
-                await update.message.reply_text("بازیکن پیدا نشد.")
-                return
-            players[str(uid)]["banned"] = False
-            players[str(uid)]["ban_reason"] = ""
-            save_players(players)
-            await update.message.reply_text(f"✅ کاربر {uid} آنبن شد.")
-        except Exception as e:
-            await update.message.reply_text(f"خطا: {e}")
+    args = context.args or []
+    if len(args) < 1:
+        await update.message.reply_text("فرمت: /ban USER_ID [دلیل]")
         return
+    try:
+        uid = int(args[0])
+        reason = " ".join(args[1:]) or "بدون توضیح"
+        players = load_players()
+        if str(uid) not in players:
+            await update.message.reply_text("بازیکن پیدا نشد.")
+            return
+        players[str(uid)]["banned"] = True
+        players[str(uid)]["ban_reason"] = reason
+        save_players(players)
+        await update.message.reply_text(f"✅ کاربر {uid} بن شد.\nدلیل: {reason}")
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
 
-    if cmd == "/setcash" and len(parts) >= 3:
-        try:
-            uid = int(parts[1])
-            amount = parse_amount(parts[2])
-            players = load_players()
-            if str(uid) not in players:
-                await update.message.reply_text("بازیکن پیدا نشد.")
-                return
-            players[str(uid)]["cash"] = amount
-            save_players(players)
-            await update.message.reply_text(f"✅ cash کاربر {uid} = {format_num(amount)}")
-        except Exception as e:
-            await update.message.reply_text(f"خطا: {e}")
+
+async def master_unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
         return
-
-    if cmd == "/setbank" and len(parts) >= 3:
-        try:
-            uid = int(parts[1])
-            amount = parse_amount(parts[2])
-            players = load_players()
-            if str(uid) not in players:
-                await update.message.reply_text("بازیکن پیدا نشد.")
-                return
-            players[str(uid)]["bank_balance"] = amount
-            save_players(players)
-            await update.message.reply_text(f"✅ bank کاربر {uid} = {format_num(amount)}")
-        except Exception as e:
-            await update.message.reply_text(f"خطا: {e}")
+    args = context.args or []
+    if len(args) < 1:
+        await update.message.reply_text("فرمت: /unban USER_ID")
         return
+    try:
+        uid = int(args[0])
+        players = load_players()
+        if str(uid) not in players:
+            await update.message.reply_text("بازیکن پیدا نشد.")
+            return
+        players[str(uid)]["banned"] = False
+        players[str(uid)]["ban_reason"] = ""
+        save_players(players)
+        await update.message.reply_text(f"✅ کاربر {uid} آنبن شد.")
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
 
-    if cmd == "/player" and len(parts) >= 2:
-        try:
-            uid = int(parts[1])
-            p = get_player_by_id(uid)
-            if not p:
-                await update.message.reply_text("بازیکن پیدا نشد.")
-                return
-            await update.message.reply_text(profile_text(p), parse_mode="HTML")
-        except Exception as e:
-            await update.message.reply_text(f"خطا: {e}")
+
+async def master_setcash_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
         return
+    args = context.args or []
+    if len(args) < 2:
+        await update.message.reply_text("فرمت: /setcash USER_ID AMOUNT")
+        return
+    try:
+        uid = int(args[0])
+        amount = parse_amount(args[1])
+        players = load_players()
+        if str(uid) not in players:
+            await update.message.reply_text("بازیکن پیدا نشد.")
+            return
+        players[str(uid)]["cash"] = amount
+        save_players(players)
+        await update.message.reply_text(f"✅ cash کاربر {uid} = {format_num(amount)}")
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
 
-    await update.message.reply_text("دستور Master ناشناخته.")
+
+async def master_setbank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
+        return
+    args = context.args or []
+    if len(args) < 2:
+        await update.message.reply_text("فرمت: /setbank USER_ID AMOUNT")
+        return
+    try:
+        uid = int(args[0])
+        amount = parse_amount(args[1])
+        players = load_players()
+        if str(uid) not in players:
+            await update.message.reply_text("بازیکن پیدا نشد.")
+            return
+        players[str(uid)]["bank_balance"] = amount
+        save_players(players)
+        await update.message.reply_text(f"✅ bank کاربر {uid} = {format_num(amount)}")
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
+
+
+async def master_player_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
+        return
+    args = context.args or []
+    if len(args) < 1:
+        await update.message.reply_text("فرمت: /player USER_ID")
+        return
+    try:
+        uid = int(args[0])
+        p = get_player_by_id(uid)
+        if not p:
+            await update.message.reply_text("بازیکن پیدا نشد.")
+            return
+        await update.message.reply_text(profile_text(p), parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -2588,10 +1774,27 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         elif action in ("jobs", "job", "job_work", "job_skills"):
             await handle_job_action(query, parts)
+        elif action == "districts":
+            await show_districts(query, user_id)
+        elif action == "move" and len(parts) >= 2:
+            await move_district(query, parts[1], user_id)
+        elif action == "properties":
+            await show_properties(query, user_id)
+        elif action == "buyprop" and len(parts) >= 2:
+            await buy_property(query, parts[1], user_id)
+        elif action == "courses":
+            await show_courses(query, user_id)
+        elif action == "takecourse" and len(parts) >= 2:
+            await take_course(query, parts[1], user_id)
+        elif action == "transfer_help":
+            await show_transfer_help(query, user_id)
         elif action == "combat":
-            await query.edit_message_text(
+            await safe_edit_message(
+                query,
                 "⚔️ <b>مرکز مبارزه</b>\n\n"
-                "برای حمله روی پیام بازیکن ریپلای کن و بنویس «ریپ».",
+                "برای حمله روی پیام بازیکن <b>ریپلای</b> کن و بنویس:\n"
+                "<code>ریپ</code>\n\n"
+                "بعد نوع حمله و قسمت بدن را انتخاب کن.",
                 parse_mode="HTML",
                 reply_markup=combat_menu(user_id),
             )
@@ -2637,9 +1840,46 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error("Exception while handling update:", exc_info=context.error)
+    err = context.error
+    # خطاهای بی‌ضرر شبکه / پیام تغییرنیافته را فقط لاگ سبک کن
+    if isinstance(err, BadRequest):
+        msg = str(err).lower()
+        if "message is not modified" in msg:
+            logger.debug("Ignored: message is not modified")
+            return
+        if "query is too old" in msg or "query id is invalid" in msg:
+            logger.debug("Ignored: expired callback query")
+            return
+    if isinstance(err, (NetworkError, TimedOut)):
+        logger.warning("Network issue: %s", err)
+        return
+    if isinstance(err, Forbidden):
+        logger.warning("Forbidden (user blocked bot?): %s", err)
+        return
+
+    logger.error(
+        "Exception while handling update:\n%s",
+        "".join(
+            traceback.format_exception(type(err), err, err.__traceback__)
+        )
+        if err
+        else "unknown",
+    )
+
     try:
-        if update and hasattr(update, "effective_message") and update.effective_message:
+        if update is None:
+            return
+        # فقط یک بار به کاربر اطلاع بده
+        if hasattr(update, "callback_query") and update.callback_query:
+            try:
+                await update.callback_query.answer(
+                    "⚠️ خطای موقت. دوباره تلاش کن.",
+                    show_alert=False,
+                )
+            except Exception:
+                pass
+            return
+        if hasattr(update, "effective_message") and update.effective_message:
             await update.effective_message.reply_text(
                 "⚠️ یک خطای موقت رخ داد. لطفاً دوباره تلاش کن."
             )
@@ -2679,13 +1919,15 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("jobs", jobs_command))
     app.add_handler(CommandHandler("cars", cars_command))
     app.add_handler(CommandHandler("panel", panel_command))
+    # Master slash commands
+    app.add_handler(CommandHandler("ban", master_ban_cmd))
+    app.add_handler(CommandHandler("unban", master_unban_cmd))
+    app.add_handler(CommandHandler("setcash", master_setcash_cmd))
+    app.add_handler(CommandHandler("setbank", master_setbank_cmd))
+    app.add_handler(CommandHandler("player", master_player_cmd))
 
     app.add_handler(CallbackQueryHandler(callback_router))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
-    # دستورات Master که با / شروع می‌شوند (غیر از دستورات ثبت‌شده)
-    app.add_handler(
-        MessageHandler(filters.COMMAND, text_router)
-    )
 
     app.add_error_handler(error_handler)
     return app

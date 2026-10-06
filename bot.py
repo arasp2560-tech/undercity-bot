@@ -18890,7 +18890,7 @@ async def show_main_menu(update, context):
 async def start_command(update, context):
     user = update.effective_user
 
-    player = get_player(user)
+    player = get_player_safe(user.id)
 
     text = (
         "🏙 <b>به UNDERCITY خوش آمدی</b>\n\n"
@@ -19277,7 +19277,7 @@ async def show_wallet(
     query = update.callback_query
 
     user = query.from_user
-    player = get_player(user)
+    player = get_player_safe(user.id)
 
     text = (
         "💰 <b>کیف پول</b>\n\n"
@@ -19374,7 +19374,7 @@ async def show_transactions(
     query = update.callback_query
 
     user = query.from_user
-    player = get_player(user)
+    player = get_player_safe(user.id)
 
     transactions = player.get(
         "transactions",

@@ -3976,6 +3976,7 @@ def execute_vehicle_offer(
     offer_id,
     buyer_id,
 ):
+    players = load_players()
 players = load_players()
 
     buyer_key = str(

@@ -734,6 +734,167 @@ def normalize_player(player, user=None):
             user.first_name
             or player.get("name")
             or "Player"
+        )
+
+        player["username"] = (
+            user.username
+            or player.get("username")
+            or ""
+        )
+
+        player["user_id"] = int(
+            user.id
+        )
+
+    player.setdefault(
+        "name",
+        "Player"
+    )
+
+    player.setdefault(
+        "username",
+        ""
+    )
+
+    player.setdefault(
+        "level",
+        1
+    )
+
+    player.setdefault(
+        "xp",
+        0
+    )
+
+    player.setdefault(
+        "cash",
+        10000
+    )
+
+    player.setdefault(
+        "bank_balance",
+        0
+    )
+
+    player.setdefault(
+        "credit_score",
+        500
+    )
+
+    player.setdefault(
+        "reputation",
+        0
+    )
+
+    player.setdefault(
+        "banned",
+        False
+    )
+
+    player.setdefault(
+        "ban_reason",
+        ""
+    )
+
+    player.setdefault(
+        "loan",
+        0
+    )
+
+    for key in (
+        "transactions",
+        "vehicles",
+        "properties",
+        "businesses",
+        "vehicle_offers",
+        "market_listings",
+        "auctions",
+        "direct_deals",
+        "vehicle_history",
+    ):
+        if not isinstance(
+            player.get(key),
+            list
+        ):
+            player[key] = []
+
+    for key in (
+        "body",
+        "equipment",
+        "jobs",
+        "stats",
+        "last_actions",
+    ):
+        if not isinstance(
+            player.get(key),
+            dict
+        ):
+            player[key] = {}
+
+    if "pending_action" not in player:
+        player["pending_action"] = None
+
+    if "pending_purchase" not in player:
+        player["pending_purchase"] = None
+
+    try:
+        player["body"] = ensure_body_parts(
+            player.get("body")
+        )
+    except Exception:
+        try:
+            player["body"] = default_body()
+        except Exception:
+            player["body"] = {}
+
+    player["equipment"].setdefault(
+        "clothing",
+        []
+    )
+
+    player["equipment"].setdefault(
+        "armor",
+        []
+    )
+
+    player["equipment"].setdefault(
+        "weapons",
+        []
+    )
+
+    for job_id in (
+        "barber",
+        "mechanic",
+    ):
+        if not isinstance(
+            player["jobs"].get(job_id),
+            dict
+        ):
+            player["jobs"][job_id] = {
+                "xp": 0,
+                "sessions": 0,
+                "rank": "apprentice",
+            }
+
+    for key in (
+        "fights",
+        "hits",
+        "wins",
+        "losses",
+        "damage_dealt",
+        "damage_received",
+        "vehicles_bought",
+        "vehicles_sold",
+        "jobs_done",
+        "money_sent",
+        "money_received",
+    ):
+        player["stats"].setdefault(
+            key,
+            0
+        )
+
+    return player
        # ============================================================
 # PART 2
 # START / HELP / PROFILE / WALLET / MONEY TRANSFER

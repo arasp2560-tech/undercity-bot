@@ -14047,7 +14047,8 @@ async def handle_deal_accept(
     await query.answer(
         "⏳ در حال نهایی کردن معامله..."
     )
-players = load_players()
+
+    players = load_players()
 
     result = accept_direct_sale(
         players,
@@ -14090,7 +14091,7 @@ players = load_players()
                 InlineKeyboardButton(
                     "🚘 گاراژ",
                     callback_data=(
-                        f"garage|{seller_id}"
+                        f"garage|{buyer_id}"
                     )
                 )
             ]

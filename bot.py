@@ -11571,10 +11571,10 @@ def remove_market_listing(
     listing["status"] = "cancelled"
     listing["updated_at"] = time.time()
 
-        return {
-            "success": True,
-            "listing": listing,
-        }
+    return {
+        "success": True,
+        "listing": listing,
+}
 
 
 # ------------------------------------------------------------

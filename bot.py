@@ -3977,7 +3977,6 @@ def execute_vehicle_offer(
     buyer_id,
 ):
     players = load_players()
-players = load_players()
 
     buyer_key = str(
         buyer_id
@@ -4065,7 +4064,7 @@ players = load_players()
 
         return False, (
             "خودرو دیگر متعلق به فروشنده نیست."
-        )
+)
 
     amount = int(
         offer.get(

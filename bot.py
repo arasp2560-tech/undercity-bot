@@ -17977,7 +17977,8 @@ def work_difficulty_keyboard(
         "id",
         player.get("user_id")
     )
-return InlineKeyboardMarkup([
+
+    return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
                 "🟢 آسان",

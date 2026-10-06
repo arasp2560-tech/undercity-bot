@@ -21726,14 +21726,10 @@ async def handle_job_callback(
             if len(parts) > 1
             else "barber"
         )
-
+        
         result = job_session(
             player,
             job_key
-        )
-
-        safe_save_players(
-            load_players()
         )
 
         # ذخیره واقعی بازیکن
@@ -21747,13 +21743,14 @@ async def handle_job_callback(
                 5
             )
         ]
-promotion = ""
-      
-    if result["new_rank"] > result["old_rank"]:
+
+        promotion = ""
+
+        if result["new_rank"] > result["old_rank"]:
             promotion = (
                 "\n\n🎉 <b>تبریک!</b>\n"
                 "رتبه شغلی شما ارتقا پیدا کرد."
-)
+            )
 
         text = (
             f"💼 <b>شیفت کاری تمام شد</b>\n\n"

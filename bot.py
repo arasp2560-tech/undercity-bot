@@ -25650,6 +25650,39 @@ def startup_database():
 # ------------------------------------------------------------
 # 20. FINAL APPLICATION BUILDER PATCH
 # ------------------------------------------------------------
+async def global_error_handler(update, context):
+    import traceback
+
+    print("=" * 70)
+    print("UNDERCITY ERROR")
+    print("ERROR:", repr(context.error))
+
+    if context.error:
+        traceback.print_exception(
+            type(context.error),
+            context.error,
+            context.error.__traceback__,
+        )
+
+    print("=" * 70)
+
+    try:
+        if update and update.callback_query:
+            await update.callback_query.answer(
+                "⚠️ خطای داخلی رخ داد.",
+                show_alert=True,
+            )
+    except Exception:
+        pass
+
+    try:
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "⚠️ یک خطای موقت رخ داد. لطفاً دوباره تلاش کن."
+            )
+    except Exception:
+        pass
+
 
 def build_application():
     token = os.environ.get(

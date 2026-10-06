@@ -19191,8 +19191,7 @@ async def help_command(update, context):
 
 async def help_callback(
     update,
-    context,
-    page
+    context
 ):
     query = update.callback_query
 
@@ -19202,6 +19201,11 @@ async def help_callback(
     parts = (query.data or "").split("|")
 
     if len(parts) < 3:
+        await answer_callback(
+            query,
+            "❌ اطلاعات صفحه نامعتبر است.",
+            True
+        )
         return
 
     if not callback_is_owner(
@@ -19215,13 +19219,18 @@ async def help_callback(
         )
         return
 
+    try:
+        page = int(parts[1])
+    except (ValueError, TypeError):
+        page = 1
+
     await answer_callback(query)
 
     await show_help_page(
         update,
         context,
-        int(page)
-    )
+        page
+)
 
 
 # ------------------------------------------------------------

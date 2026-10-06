@@ -3336,7 +3336,6 @@ def execute_vehicle_purchase(
     # --------------------------------------------------------
     # جلوگیری از اجرای تکراری عملیات
     # --------------------------------------------------------
-
     for transaction in buyer.get(
         "transactions",
         [],
@@ -3359,8 +3358,7 @@ def execute_vehicle_purchase(
                 and transaction.get(
                     "reference_id"
                 )
-            :
-
+            ):
                 # این بررسی فقط برای خریدهای ثبت‌شده
                 # قبلی است؛ خرید جدید reference جدید دارد.
                 pass

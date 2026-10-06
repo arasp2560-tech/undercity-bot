@@ -24216,7 +24216,7 @@ def instant_sell_vehicle_once(
                 "reason": "seller_not_found",
             }
 
-                ensure_vehicle_system(
+        ensure_vehicle_system(
             seller
         )
 
@@ -24300,7 +24300,7 @@ def instant_sell_vehicle_once(
             "already_done": False,
             "price": price,
             "vehicle": vehicle,
-}
+        }
 
 # ------------------------------------------------------------
 # 15. INSTANT SELL CALLBACK

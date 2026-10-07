@@ -749,6 +749,8 @@ def normalize_player(player: dict, user: Optional[User] = None) -> dict:
         "stats": {},
         "pending": None,
         "last_actions": {},
+        "dead": False,
+        "dead_until": 0,
     }
 
     for k, v in defaults.items():

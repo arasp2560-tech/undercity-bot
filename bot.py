@@ -1217,19 +1217,28 @@ def combat_menu(user_id: int) -> InlineKeyboardMarkup:
 def profile_text(player: dict) -> str:
     name = esc(player.get("name", "بازیکن"))
     username = player.get("username") or "ندارد"
+
     if username != "ندارد" and not username.startswith("@"):
         username = f"@{username}"
+
     username = esc(username)
+
+    user_id = player.get("user_id", "نامشخص")
     level = player.get("level", 1)
     xp = player.get("xp", 0)
+
     next_xp = xp_required(level)
+
     body = player.get("body", {})
     hp = body.get("hp", 100)
     max_hp = body.get("max_hp", 100)
+
     loc_key = player.get("location", "south")
     loc_name = DISTRICTS.get(loc_key, {}).get("name", loc_key)
+
     return (
         "👤 <b>پروفایل شخصیت</b>\n\n"
+        f"🆔 ID عددی: <code>{user_id}</code>\n"
         f"🪪 نام: {name}\n"
         f"🔹 Username: {username}\n\n"
         f"⭐ Level: {level}\n"
@@ -1239,10 +1248,13 @@ def profile_text(player: dict) -> str:
         f"💵 پول نقد: {format_num(player.get('cash', 0))}\n"
         f"🏦 بانک: {format_num(player.get('bank_balance', 0))}\n"
         f"💳 اعتبار: {player.get('credit_score', 0)}\n"
-        f"⭐ شهرت: {player.get('reputation', 0)}\n\n"
+        f"⭐ شهرت: {player.get('reputation', 0)}\n"
+        f"🚫 بن: {'بله' if player.get('banned') else 'خیر'}\n\n"
         f"🚗 خودروها: {len(player.get('vehicles', []))}\n"
         f"🏠 املاک: {len(player.get('properties', []))}\n"
-        f"🏪 کسب‌وکارها: {len(player.get('businesses', []))}"
+        f"🏪 کسب‌وکارها: {len(player.get('businesses', []))}\n"
+        f"💼 مشاغل: {len(player.get('jobs', {}))}\n"
+        f"📜 تراکنش‌ها: {len(player.get('transactions', []))}"
     )
 
 

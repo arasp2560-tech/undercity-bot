@@ -3504,7 +3504,10 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("setcash", master_setcash_cmd))
     app.add_handler(CommandHandler("setbank", master_setbank_cmd))
     app.add_handler(CommandHandler("player", master_player_cmd))
-
+    app.add_handler(CommandHandler("setlevel", master_setlevel_cmd))
+    app.add_handler(CommandHandler("setxp", master_setxp_cmd))
+    app.add_handler(CommandHandler("setrep", master_setrep_cmd))
+    
     app.add_handler(CallbackQueryHandler(callback_router))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 

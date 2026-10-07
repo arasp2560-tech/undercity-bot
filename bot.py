@@ -552,6 +552,27 @@ def is_master(user_id) -> bool:
         return False
 
 
+def actor_name(user_id: int, fallback: str = "بازیکن") -> str:
+    if is_master(user_id):
+        return "Master"
+    return fallback or "بازیکن"
+
+
+def resolve_player_identifier(identifier: str, players: dict):
+    identifier = str(identifier).strip()
+
+    if identifier.startswith("@"):
+        key, player = find_player_by_username(players, identifier)
+        return key, player
+
+    if identifier.isdigit():
+        key = str(int(identifier))
+        return (key, players[key]) if key in players else (None, None)
+
+    key, player = find_player_by_username(players, identifier)
+    return key, player
+
+
 def make_id(prefix: str = "ID") -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12].upper()}"
 

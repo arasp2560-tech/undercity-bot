@@ -996,7 +996,7 @@ def execute_money_transfer(
             sender,
             "transfer_sent",
             amount,
-            f"انتقال به بازیکن {receiver_id}",
+            f"انتقال به {actor_name(receiver_id, receiver.get('name', 'بازیکن'))}",
             direction="out",
             reference_id=transfer_id,
         )

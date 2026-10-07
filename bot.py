@@ -947,7 +947,7 @@ def execute_money_transfer(
             return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
 
         from_bank = min(bank, amount)
-        from_cash = amount - from_bank
+                from_cash = amount - from_bank
 
         sender["bank_balance"] = bank - from_bank
         sender["cash"] = cash - from_cash
@@ -956,15 +956,7 @@ def execute_money_transfer(
             int(receiver.get("bank_balance", 0)) + amount
         )
 
-receiver["bank_balance"] = (
-    int(receiver.get("bank_balance", 0))
-    + amount
-)
-
         transfer_id = make_id("TRF")
-
-        sender["bank_balance"] -= amount
-        receiver["bank_balance"] = receiver.get("bank_balance", 0) + amount
 
         add_transaction(
             sender,
@@ -972,14 +964,6 @@ receiver["bank_balance"] = (
             amount,
             f"انتقال به بازیکن {receiver_id}",
             direction="out",
-            reference_id=transfer_id,
-        )
-        add_transaction(
-            receiver,
-            "transfer_received",
-            amount,
-            f"دریافت از بازیکن {sender_id}",
-            direction="in",
             reference_id=transfer_id,
         )
 

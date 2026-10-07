@@ -937,7 +937,7 @@ if s_key not in players:
 if r_key not in players:
     return False, "حساب گیرنده پیدا نشد."
 
-        sender = normalize_player(players[s_key])
+          sender = normalize_player(players[s_key])
         receiver = normalize_player(players[r_key])
 
 bank = int(sender.get("bank_balance", 0))

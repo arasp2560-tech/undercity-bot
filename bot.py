@@ -581,7 +581,26 @@ def timestamp() -> int:
     return int(time.time())
 
 
+def cooldown_remaining(player: dict, action: str, cooldown: int) -> int:
+    now = timestamp()
+    last = int(player.get("last_actions", {}).get(action, 0))
+
+    remaining = cooldown - (now - last)
+
+    if remaining > 0:
+        return remaining
+
+    return 0
+
+
+def start_cooldown(player: dict, action: str) -> None:
+    player.setdefault("last_actions", {})
+    player["last_actions"][action] = timestamp()
+
+
 def xp_required(level: int) -> int:
+
+            
     return 100 + (max(1, level) - 1) * 75
 
 

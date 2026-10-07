@@ -928,21 +928,46 @@ def execute_money_transfer(
         players = load_players()
         s_key, r_key = str(sender_id), str(receiver_id)
 
-        if s_key not in players:
+                if s_key not in players:
             return False, "حساب فرستنده پیدا نشد."
+
         if r_key not in players:
             return False, "حساب گیرنده پیدا نشد."
 
-        sender = normalize_player(players[s_key])
-        receiver = normalize_player(players[r_key])
+        sender = normalize_player(
+            players[s_key]
+        )
 
-bank = int(sender.get("bank_balance", 0))
-cash = int(sender.get("cash", 0))
+        receiver = normalize_player(
+            players[r_key]
+        )
 
-if bank + cash < amount:
-    return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
-       from_bank = min(bank, amount)
-from_cash = amount - from_bank
+        bank = int(
+            sender.get(
+                "bank_balance",
+                0
+            )
+        )
+
+        cash = int(
+            sender.get(
+                "cash",
+                0
+            )
+        )
+
+        if bank + cash < amount:
+            return False, (
+                "موجودی کافی نیست. "
+                "بانک و نقد با هم کم می‌شود."
+            )
+
+        from_bank = min(
+            bank,
+            amount
+        )
+
+        from_cash = amount - from_bank
 
 sender["bank_balance"] = bank - from_bank
 sender["cash"] = cash - from_cash

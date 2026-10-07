@@ -3205,7 +3205,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 query,
                 "⚔️ <b>مرکز مبارزه</b>\n\n"
                 "برای حمله روی پیام بازیکن <b>ریپلای</b> کن و بنویس:\n"
-                "<code>ریپ</code>\n\n"
+                "<code>حمله</code>\n\n"
                 "بعد نوع حمله و قسمت بدن را انتخاب کن.",
                 parse_mode="HTML",
                 reply_markup=combat_menu(user_id),

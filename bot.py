@@ -941,12 +941,16 @@ cash = int(sender.get("cash", 0))
 
 if bank + cash < amount:
     return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
-       
-    from_bank = min(bank, amount)
-        from_cash = amount - from_bank
-        sender["bank_balance"] = bank - from_bank
-        sender["cash"] = cash - from_cash
-        receiver["bank_balance"] = int(receiver.get("bank_balance", 0)) + amount
+       from_bank = min(bank, amount)
+from_cash = amount - from_bank
+
+sender["bank_balance"] = bank - from_bank
+sender["cash"] = cash - from_cash
+
+receiver["bank_balance"] = (
+    int(receiver.get("bank_balance", 0))
+    + amount
+)
 
         transfer_id = make_id("TRF")
 

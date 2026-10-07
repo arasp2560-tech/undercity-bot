@@ -706,6 +706,8 @@ def create_player(user: User) -> dict:
         },
         "pending": None,
         "last_actions": {},
+        "dead": False,
+        "dead_until": 0,
         "created_at": timestamp(),
     }
 

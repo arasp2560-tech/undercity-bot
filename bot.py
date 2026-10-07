@@ -936,12 +936,16 @@ def execute_money_transfer(
         sender = normalize_player(players[s_key])
         receiver = normalize_player(players[r_key])
 
-        if sender.get("banned"):
-            return False, "حساب فرستنده مسدود است."
-        if receiver.get("banned"):
-            return False, "حساب گیرنده مسدود است."
-        if sender.get("bank_balance", 0) < amount:
-            return False, "موجودی بانکی کافی نیست."
+bank = int(sender.get("bank_balance", 0))
+        cash = int(sender.get("cash", 0))
+        if bank + cash < amount:
+            return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
+
+        from_bank = min(bank, amount)
+        from_cash = amount - from_bank
+        sender["bank_balance"] = bank - from_bank
+        sender["cash"] = cash - from_cash
+        receiver["bank_balance"] = int(receiver.get("bank_balance", 0)) + amount
 
         transfer_id = make_id("TRF")
 
@@ -2934,13 +2938,24 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await menu_command(update, context)
         return
 
-    # مبارزه
-    if low in ("ریپ", "rep"):
+    # مبارزه: Reply روی پیام بازیکن + کلمه حمله
+    fight_words = {
+        "حمله",
+        "ضربه",
+        "نبرد",
+        "دعوا",
+        "fight",
+        "attack",
+    }
+    if low in fight_words or text in fight_words:
         if update.message.reply_to_message:
             await start_fight_from_reply(update, context)
         else:
             await update.message.reply_text(
-                "⚔️ برای مبارزه روی پیام بازیکن ریپلای کن و «ریپ» بفرست."
+                "⚔️ برای حمله:\n"
+                "۱) روی پیام بازیکن مقابل Reply بزن\n"
+                "۲) بنویس: حمله\n\n"
+                "⚠️ در گروه: BotFather → /setprivacy → Disable"
             )
         return
 

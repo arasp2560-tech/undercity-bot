@@ -3357,28 +3357,30 @@ def main():
 
     startup()
 
-    # Health server
     try:
-        t = threading.Thread(target=run_health_server, daemon=True)
+        t = threading.Thread(
+            target=run_health_server,
+            daemon=True,
+            name="health-server",
+        )
         t.start()
-        logger.info("Health server on port %s", PORT)
-    except Exception as e:
-        logger.warning("Health server failed: %s", e)
+        logger.info("Health server started on port %s", PORT)
+    except Exception:
+        logger.exception("Health server failed to start")
 
     app = build_application()
-logger.info("Starting polling...")
+    logger.info("Starting polling...")
 
-try:
-    app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-        stop_signals=None,
-    )
-except Exception:
-    logger.exception("BOT STOPPED UNEXPECTEDLY")
-    raise
-finally:
-    logger.info("Bot process is shutting down.")
+    try:
+        app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+        )
+    except Exception:
+        logger.exception("BOT STOPPED UNEXPECTEDLY")
+        raise
+    finally:
+        logger.info("Bot process is shutting down.")
 
 
 if __name__ == "__main__":

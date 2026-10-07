@@ -928,7 +928,7 @@ def execute_money_transfer(
         players = load_players()
         s_key, r_key = str(sender_id), str(receiver_id)
 
-                if s_key not in players:
+    if s_key not in players:
         return False, "حساب فرستنده پیدا نشد."
 
 if s_key not in players:

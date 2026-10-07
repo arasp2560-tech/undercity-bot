@@ -810,7 +810,7 @@ def normalize_player(player: dict, user: Optional[User] = None) -> dict:
         player["cash"] = STARTING_CASH
         player["bank_balance"] = 0
 
-        if is_master(player.get("user_id")):
+    if is_master(player.get("user_id")):
         player["name"] = "Master"
         player["level"] = 99
         player["xp"] = 0
@@ -818,6 +818,7 @@ def normalize_player(player: dict, user: Optional[User] = None) -> dict:
         player["bank_balance"] = MASTER_BANK
         player["banned"] = False
         player["ban_reason"] = ""
+
     return player
 
 

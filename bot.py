@@ -3366,8 +3366,19 @@ def main():
         logger.warning("Health server failed: %s", e)
 
     app = build_application()
-    logger.info("Starting polling...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+logger.info("Starting polling...")
+
+try:
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True,
+        stop_signals=None,
+    )
+except Exception:
+    logger.exception("BOT STOPPED UNEXPECTEDLY")
+    raise
+finally:
+    logger.info("Bot process is shutting down.")
 
 
 if __name__ == "__main__":

@@ -3128,19 +3128,38 @@ async def master_setbank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def master_player_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _require_master(update):
         return
+
     args = context.args or []
+
     if len(args) < 1:
-        await update.message.reply_text("فرمت: /player USER_ID")
+        await update.message.reply_text(
+            "فرمت:\n"
+            "/player USER_ID\n"
+            "یا:\n"
+            "/player @username"
+        )
         return
+
     try:
-        uid = int(args[0])
-        p = get_player_by_id(uid)
-        if not p:
-            await update.message.reply_text("بازیکن پیدا نشد.")
+        identifier = args[0]
+        players = load_players()
+
+        key, p = resolve_player_identifier(identifier, players)
+
+        if not key or not p:
+            await update.message.reply_text("❌ بازیکن پیدا نشد.")
             return
-        await update.message.reply_text(profile_text(p), parse_mode="HTML")
+
+        p = normalize_player(p)
+
+        await update.message.reply_text(
+            profile_text(p),
+            parse_mode="HTML",
+        )
+
     except Exception as e:
-        await update.message.reply_text(f"خطا: {e}")
+        logger.exception("Master player lookup failed")
+        await update.message.reply_text(f"❌ خطا: {e}")
 
 
 # ══════════════════════════════════════════════════════════════

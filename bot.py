@@ -919,25 +919,25 @@ def execute_money_transfer(
     sender_id: int, receiver_id: int, amount: int
 ) -> tuple[bool, Any]:
     amount = int(amount)
+
     if amount <= 0:
         return False, "مبلغ نامعتبر است."
+
     if int(sender_id) == int(receiver_id):
         return False, "نمی‌توانی به خودت پول انتقال بدهی."
 
     with DATA_LOCK:
         players = load_players()
-        s_key, r_key = str(sender_id), str(receiver_id)
+        s_key = str(sender_id)
+        r_key = str(receiver_id)
 
-if s_key not in players:
-        return False, "حساب فرستنده پیدا نشد."
+        if s_key not in players:
+            return False, "حساب فرستنده پیدا نشد."
 
-if s_key not in players:
-    return False, "حساب فرستنده پیدا نشد."
+        if r_key not in players:
+            return False, "حساب گیرنده پیدا نشد."
 
-if r_key not in players:
-    return False, "حساب گیرنده پیدا نشد."
-
-                  sender = normalize_player(players[s_key])
+        sender = normalize_player(players[s_key])
         receiver = normalize_player(players[r_key])
 
         bank = int(sender.get("bank_balance", 0))
@@ -951,6 +951,10 @@ if r_key not in players:
 
         sender["bank_balance"] = bank - from_bank
         sender["cash"] = cash - from_cash
+
+        receiver["bank_balance"] = (
+            int(receiver.get("bank_balance", 0)) + amount
+        )
 
 receiver["bank_balance"] = (
     int(receiver.get("bank_balance", 0))

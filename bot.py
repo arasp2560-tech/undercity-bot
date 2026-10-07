@@ -3133,6 +3133,108 @@ async def master_setbank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"خطا: {e}")
 
 
+async def master_setlevel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
+        return
+
+    args = context.args or []
+
+    if len(args) < 2:
+        await update.message.reply_text(
+            "فرمت: /setlevel USER_ID_OR_USERNAME LEVEL"
+        )
+        return
+
+    try:
+        players = load_players()
+        key, player = resolve_player_identifier(args[0], players)
+
+        if not key or not player:
+            await update.message.reply_text("❌ بازیکن پیدا نشد.")
+            return
+
+        level = max(1, int(args[1]))
+
+        player = normalize_player(player)
+        player["level"] = level
+
+        players[key] = player
+        save_players(players)
+
+        await update.message.reply_text(
+            f"✅ Level بازیکن {key} شد {level}"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا: {e}")
+
+
+async def master_setxp_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
+        return
+
+    args = context.args or []
+
+    if len(args) < 2:
+        await update.message.reply_text(
+            "فرمت: /setxp USER_ID_OR_USERNAME XP"
+        )
+        return
+
+    try:
+        players = load_players()
+        key, player = resolve_player_identifier(args[0], players)
+
+        if not key or not player:
+            await update.message.reply_text("❌ بازیکن پیدا نشد.")
+            return
+
+        player = normalize_player(player)
+        player["xp"] = max(0, int(args[1]))
+
+        players[key] = player
+        save_players(players)
+
+        await update.message.reply_text(
+            f"✅ XP بازیکن تنظیم شد: {format_num(player['xp'])}"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا: {e}")
+
+
+async def master_setrep_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _require_master(update):
+        return
+
+    args = context.args or []
+
+    if len(args) < 2:
+        await update.message.reply_text(
+            "فرمت: /setrep USER_ID_OR_USERNAME VALUE"
+        )
+        return
+
+    try:
+        players = load_players()
+        key, player = resolve_player_identifier(args[0], players)
+
+        if not key or not player:
+            await update.message.reply_text("❌ بازیکن پیدا نشد.")
+            return
+
+        player = normalize_player(player)
+        player["reputation"] = int(args[1])
+
+        players[key] = player
+        save_players(players)
+
+        await update.message.reply_text("✅ شهرت تغییر کرد.")
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا: {e}")
+
+
 async def master_player_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _require_master(update):
         return

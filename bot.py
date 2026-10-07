@@ -947,7 +947,7 @@ def execute_money_transfer(
             return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
 
         from_bank = min(bank, amount)
-                from_cash = amount - from_bank
+        from_cash = amount - from_bank
 
         sender["bank_balance"] = bank - from_bank
         sender["cash"] = cash - from_cash

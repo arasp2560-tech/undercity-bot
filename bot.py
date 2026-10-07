@@ -598,6 +598,25 @@ def start_cooldown(player: dict, action: str) -> None:
     player["last_actions"][action] = timestamp()
 
 
+def update_player_life(player: dict) -> None:
+    if not player.get("dead"):
+        return
+
+    if timestamp() < int(player.get("dead_until", 0)):
+        return
+
+    player["dead"] = False
+    player["dead_until"] = 0
+
+    body = player.setdefault("body", default_body())
+
+    body["hp"] = body.get("max_hp", 100)
+
+    for part_id, part_data in body.get("parts", {}).items():
+        if isinstance(part_data, dict):
+            part_data["hp"] = part_data.get("max_hp", 0)
+
+
 def xp_required(level: int) -> int:
 
             

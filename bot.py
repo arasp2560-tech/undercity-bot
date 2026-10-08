@@ -3482,12 +3482,16 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if action == "main":
             await show_main_menu(query, user_id)
+
         elif action == "profile":
             await show_profile(query, user_id)
+
         elif action == "wallet":
             await show_wallet(query, user_id)
+
         elif action == "transactions":
             await show_transactions(query, user_id)
+
         elif action == "equipment":
             await query.edit_message_text(
                 "🛡️ <b>تجهیزات</b>\n\n"
@@ -3495,6 +3499,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=equipment_menu(user_id),
             )
+
         elif action == "equipment_shop":
             buttons = []
             for equip_id, item in EQUIPMENT.items():
@@ -3505,37 +3510,48 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         callback_data=f"buyequip|{equip_id}|{user_id}",
                     )
                 ])
+
             buttons.append([
                 InlineKeyboardButton(
                     "🔙 بازگشت",
                     callback_data=f"equipment|{user_id}",
                 )
             ])
+
             await query.edit_message_text(
                 "🛍️ <b>فروشگاه تجهیزات</b>\n\n"
                 "تجهیزات موردنظر خود را انتخاب کن:",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
+
         elif action == "my_equipment":
             player = get_player(query.from_user)
             equipment = player.get("equipment", {})
             clothes = equipment.get("clothes", "normal_clothes")
             armor = equipment.get("armor")
             weapons = equipment.get("weapons", [])
+
             clothes_name = EQUIPMENT.get(clothes, {}).get("name", clothes)
             armor_name = EQUIPMENT.get(armor, {}).get("name", "ندارد") if armor else "ندارد"
+
             text = (
                 "🎒 <b>تجهیزات من</b>\n\n"
                 f"👕 لباس: {clothes_name}\n"
                 f"🛡️ زره: {armor_name}\n"
                 f"🔪 تعداد سلاح‌ها: {len(weapons)}"
             )
+
             await query.edit_message_text(
                 text,
                 parse_mode="HTML",
                 reply_markup=equipment_menu(user_id),
             )
+
+        elif action == "buyequip" and len(parts) >= 2:
+            equip_id = parts[1]
+            await safe_answer(query, "⏳ خرید تجهیزات هنوز به سیستم خرید متصل نشده.", True)
+
         elif action == "help":
             if len(parts) >= 2 and parts[1] != "noop":
                 page = int(parts[1])
@@ -3544,34 +3560,46 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     help_page_text(page),
                     reply_markup=help_keyboard(user_id, page),
                 )
+
         elif action == "vehicles":
             await query.edit_message_text(
                 "🚗 <b>خودرو</b>\n\nاز گزینه‌های زیر استفاده کن:",
                 parse_mode="HTML",
                 reply_markup=vehicles_menu(user_id),
             )
+
         elif action == "showroom":
             await show_showroom(query, user_id)
+
         elif action == "showcar" and len(parts) >= 2:
             await show_catalog_vehicle(query, parts[1], user_id)
+
         elif action == "buycar" and len(parts) >= 2:
             await buy_vehicle(query, parts[1], user_id)
+
         elif action == "garage":
             await show_garage(query, user_id)
+
         elif action == "mycar" and len(parts) >= 2:
             await show_my_vehicle(query, parts[1], user_id)
+
         elif action == "sellcar" and len(parts) >= 2:
             await sell_car_instant(query, parts[1], user_id)
+
         elif action == "listcar" and len(parts) >= 2:
             await prepare_list_car(query, parts[1], user_id)
+
         elif action == "giftcar" and len(parts) >= 2:
             await prepare_gift_car(query, parts[1], user_id)
+
         elif action == "carmarket":
             await query.edit_message_text(
-                "🏪 <b>بازار خودرو</b>\n\nفعلاً آگهی‌ها از طریق «آگهی بازار» در گاراژ ثبت می‌شوند.\n"
+                "🏪 <b>بازار خودرو</b>\n\n"
+                "فعلاً آگهی‌ها از طریق «آگهی بازار» در گاراژ ثبت می‌شوند.\n"
                 "نسخه کامل بازار به‌زودی تکمیل می‌شود.",
                 parse_mode="HTML",
                 reply_markup=back_button(user_id, "vehicles"),
+        )
             )
         elif action in ("jobs", "job", "job_work", "job_skills"):
             await handle_job_action(query, parts)

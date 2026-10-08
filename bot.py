@@ -2959,23 +2959,35 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             await update.message.reply_text("❌ نمی‌توانی به خودت هدیه بدهی.")
             return True
 
-        vehicle_id = pending.get("vehicle_id")
+         vehicle_id = pending.get("vehicle_id")
+
         with DATA_LOCK:
             players = load_players()
+
             sender = normalize_player(players[str(user.id)])
             receiver = normalize_player(players[receiver_key])
+
             vehicle = get_vehicle_by_id(sender, vehicle_id)
+
             if not vehicle:
                 player["pending"] = None
                 save_player(user.id, player)
-update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
+
+                await update.message.reply_text(
+                    "❌ خودرو دیگر در گاراژ نیست."
+                )
                 return True
+
             remove_vehicle(sender, vehicle_id)
+
             gifted = copy.deepcopy(vehicle)
             gifted["owner_id"] = int(receiver_key)
             gifted["gifted_at"] = timestamp()
+
             receiver.setdefault("vehicles", []).append(gifted)
+
             ref = make_id("GFT")
+
             add_transaction(
                 sender,
                 "vehicle_gift_sent",
@@ -2984,6 +2996,7 @@ update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
                 direction="out",
                 reference_id=ref,
             )
+
             add_transaction(
                 receiver,
                 "vehicle_gift_received",
@@ -2991,6 +3004,7 @@ update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
                 f"دریافت هدیه {vehicle_name(vehicle)} از {user.id}",
                 direction="in",
                 reference_id=ref,
+            )
             )
             sender["pending"] = None
             players[str(user.id)] = sender

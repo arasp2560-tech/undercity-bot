@@ -2236,16 +2236,34 @@ async def handle_attack_part(
         damage = max(1, int(base_dmg * mult))
 
         # اعمال آسیب
-        body = target.setdefault("body", default_body())
-        parts = body.setdefault("parts", {})
-        if part_id not in parts:
-            parts[part_id] = {
-                "hp": BODY_PARTS[part_id]["max_hp"],
-                "max_hp": BODY_PARTS[part_id]["max_hp"],
-            }
-        parts[part_id]["hp"] = max(0, parts[part_id]["hp"] - damage)
-        body["hp"] = max(0, body.get("hp", 100) - max(1, damage // 3))
+body = target.setdefault("body", default_body())
+parts = body.setdefault("parts", {})
 
+if part_id not in parts:
+    parts[part_id] = {
+        "hp": BODY_PARTS[part_id]["max_hp"],
+        "max_hp": BODY_PARTS[part_id]["max_hp"],
+    }
+
+# مقدار واقعی آسیب به HP کلی
+old_hp = int(body.get("hp", body.get("max_hp", 100)))
+actual_damage = min(damage, old_hp)
+
+# کم کردن HP کلی به اندازه واقعی Damage
+body["hp"] = max(0, old_hp - actual_damage)
+
+# کم کردن HP همان عضو بدن
+old_part_hp = int(parts[part_id].get("hp", parts[part_id]["max_hp"]))
+parts[part_id]["hp"] = max(0, old_part_hp - actual_damage)
+
+# Damage ثبت‌شده = Damage واقعی
+damage = actual_damage
+
+# بررسی مرگ
+if body["hp"] <= 0:
+    body["hp"] = 0
+    target["dead"] = True
+    target["dead_until"] = timestamp() + 600
         # احتمال آسیب
         injury = None
         roll = random.randint(1, 100)

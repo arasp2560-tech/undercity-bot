@@ -2292,10 +2292,11 @@ async def handle_attack_part(
             )
             body["injuries"] = body["injuries"][-20:]
 
+
         attacker["stats"]["fights"] = attacker["stats"].get("fights", 0) + 1
         attacker["stats"]["hits"] = attacker["stats"].get("hits", 0) + 1
-                attacker["stats"]["damage_dealt"] = (
-            attacker["stats"].get("damage_dealt", 0) + damage
+        attacker["stats"]["damage_dealt"] = (
+        attacker["stats"].get("damage_dealt", 0) + damage
         )
         target["stats"]["damage_received"] = (
             target["stats"].get("damage_received", 0) + damage

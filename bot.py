@@ -2942,28 +2942,37 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             normalize_digits(text),
             re.I,
         )
-        if m:
-            identifier = m.group(1)
-        players = load_players()
-        receiver_key = None
-        if identifier.isdigit():
-            if str(identifier) in players:
-                receiver_key = str(identifier)
-        else:
-            receiver_key, _ = find_player_by_username(players, identifier)
+                if m:
+            identifier = m.group(1).strip()
 
-        if not receiver_key:
-            await update.message.reply_text("❌ گیرنده پیدا نشد.")
-            return True
-        if int(receiver_key) == user.id:
-            await update.message.reply_text("❌ نمی‌توانی به خودت هدیه بدهی.")
-            return True
+            players = load_players()
+            receiver_key = None
 
-         vehicle_id = pending.get("vehicle_id")
+            if identifier.isdigit():
+                if str(identifier) in players:
+                    receiver_key = str(identifier)
+            else:
+                receiver_key, _ = find_player_by_username(
+                    players,
+                    identifier
+                )
+
+            if not receiver_key:
+                await update.message.reply_text(
+                    "❌ گیرنده پیدا نشد."
+                )
+                return True
+
+            if int(receiver_key) == user.id:
+                await update.message.reply_text(
+                    "❌ نمی‌توانی به خودت هدیه بدهی."
+                )
+                return True
+
+        vehicle_id = pending.get("vehicle_id")
 
         with DATA_LOCK:
             players = load_players()
-
             sender = normalize_player(players[str(user.id)])
             receiver = normalize_player(players[receiver_key])
 

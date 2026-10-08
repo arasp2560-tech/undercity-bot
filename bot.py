@@ -1041,10 +1041,10 @@ def execute_money_transfer(
         s_key = str(sender_id)
         r_key = str(receiver_id)
 
-        if s_key not in players:
+    if s_key not in players:
             return False, "حساب فرستنده پیدا نشد."
 
-        if r_key not in players:
+    if r_key not in players:
             return False, "حساب گیرنده پیدا نشد."
 
         sender = normalize_player(players[s_key])
@@ -1053,7 +1053,7 @@ def execute_money_transfer(
         bank = int(sender.get("bank_balance", 0))
         cash = int(sender.get("cash", 0))
 
-        if bank + cash < amount:
+     if bank + cash < amount:
             return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
 
         from_bank = min(bank, amount)
@@ -1677,8 +1677,8 @@ def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]
         ref = make_id("PUR")
         # جلوگیری از خرید تکراری با همان reference (idempotency ساده)
         for tx in buyer.get("transactions", []):
-            if tx.get("reference_id") == ref:
-                return False, "این خرید قبلاً انجام شده."
+        if tx.get("reference_id") == ref:
+           return False, "این خرید قبلاً انجام شده."
 
         buyer["bank_balance"] -= price
         vehicle = create_vehicle_from_catalog(catalog_id, buyer_id)
@@ -1831,7 +1831,7 @@ def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
         players = load_players()
         key = str(seller_id)
         if key not in players:
-            return False, "حساب پیدا نشد."
+          return False, "حساب پیدا نشد."
         seller = normalize_player(players[key])
         vehicle = get_vehicle_by_id(seller, vehicle_id)
         if not vehicle:
@@ -1844,7 +1844,7 @@ def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
             f"instant_sale:{vehicle_id}:{seller_id}".encode()
         ).hexdigest()[:24]
         for h in seller.get("vehicle_history", []):
-            if h.get("operation_id") == op_id:
+        if h.get("operation_id") == op_id:
                 return True, {"already_done": True, "price": price}
 
         if not remove_vehicle(seller, vehicle_id):
@@ -2091,7 +2091,7 @@ async def handle_job_action(query, parts: list):
         await query.edit_message_text(text, reply_markup=kb)
         return
 
-    if action == "job_work":
+        if action == "job_work":
         job_key = parts[1] if len(parts) > 2 else "barber"
         if job_key not in JOBS:
             await safe_answer(query, "شغل نامعتبر.", True)
@@ -2184,7 +2184,8 @@ async def start_fight_from_reply(update: Update, context: ContextTypes.DEFAULT_T
 
     rows = []
     for aid, atk in ATTACKS.items():
-        if attacker.get("level", 1) >= atk.get("level", 1):
+
+    if attacker.get("level", 1) >= atk.get("level", 1):
             rows.append(
                 [
                     InlineKeyboardButton(
@@ -2399,45 +2400,44 @@ async def show_clinic(query, user_id: int):
 
 
 async def treat_all(query, user_id: int):
+    players = load_players()
+    key = str(user_id)
+    if key not in players:
+        await safe_answer(query, "حساب پیدا نشد.", True)
+        return
+    player = normalize_player(players[key])
+    body = player.get("body", default_body())
+    injuries = body.get("injuries", [])
+    if not injuries:
+        await safe_answer(query, "آسیبی برای درمان نیست.")
+        return
+    total = 0
+    for inj in injuries:
+        total += INJURY_TYPES.get(inj.get("type", "bruise"), {}).get("cost", 10000)
+    if player.get("bank_balance", 0) < total and player.get("cash", 0) < total:
+        await safe_answer(query, "پول کافی نیست.", True)
+        return
+    if player.get("bank_balance", 0) >= total:
+        player["bank_balance"] -= total
+    else:
+        player["cash"] -= total
 
-        players = load_players()
-        key = str(user_id)
-        if key not in players:
-            await safe_answer(query, "حساب پیدا نشد.", True)
-            return
-        player = normalize_player(players[key])
-        body = player.get("body", default_body())
-        injuries = body.get("injuries", [])
-        if not injuries:
-            await safe_answer(query, "آسیبی برای درمان نیست.")
-            return
-        total = 0
-        for inj in injuries:
-            total += INJURY_TYPES.get(inj.get("type", "bruise"), {}).get("cost", 10000)
-        if player.get("bank_balance", 0) < total and player.get("cash", 0) < total:
-            await safe_answer(query, "پول کافی نیست.", True)
-            return
-        if player.get("bank_balance", 0) >= total:
-            player["bank_balance"] -= total
-        else:
-            player["cash"] -= total
-
-        # درمان
-        body["injuries"] = []
-        body["hp"] = body.get("max_hp", 100)
-        for pid, pdata in BODY_PARTS.items():
-            if pid in body.get("parts", {}):
-                body["parts"][pid]["hp"] = pdata["max_hp"]
-        player["body"] = body
-        add_transaction(
-            player,
-            "clinic",
-            total,
-            "درمان کامل در کلینیک",
-            direction="out",
-        )
-        players[key] = player
-        save_players(players)
+    # درمان
+    body["injuries"] = []
+    body["hp"] = body.get("max_hp", 100)
+    for pid, pdata in BODY_PARTS.items():
+        if pid in body.get("parts", {}):
+            body["parts"][pid]["hp"] = pdata["max_hp"]
+    player["body"] = body
+    add_transaction(
+        player,
+        "clinic",
+        total,
+        "درمان کامل در کلینیک",
+        direction="out",
+    )
+    players[key] = player
+    save_players(players)
 
     await query.edit_message_text(
         f"✅ درمان کامل انجام شد.\n💰 هزینه: {format_num(total)}",

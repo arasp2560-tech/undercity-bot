@@ -3600,7 +3600,6 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=back_button(user_id, "vehicles"),
         )
-            )
         elif action in ("jobs", "job", "job_work", "job_skills"):
             await handle_job_action(query, parts)
         elif action == "districts":

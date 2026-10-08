@@ -2303,7 +2303,14 @@ async def handle_attack_part(
         add_xp(attacker, atk["xp"])
 
         players[a_key] = attacker
-       
+        players[t_key] = target
+        save_players(players)
+
+    part_name = BODY_PARTS[part_id]["name"]
+    inj_text = ""
+    if injury:
+        inj_text = f"\n🩸 آسیب: {INJURY_TYPES[injury]['name']}"
+        
     await query.edit_message_text(
         f"⚔️ <b>حمله موفق</b>\n\n"
         f"{atk['name']} به {part_name}\n"

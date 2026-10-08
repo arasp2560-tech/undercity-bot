@@ -57,12 +57,13 @@ logger = logging.getLogger("UNDERCITY")
 # ══════════════════════════════════════════════════════════════
 
 PORT = int(os.environ.get("PORT", 10000))
-PLAYERS_FILE = os.environ.get("PLAYERS_FILE", "players.json")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 MASTER_USER_ID = int(os.environ.get("MASTER_USER_ID", "5750241558"))
 MASTER_CASH = 10_000_000_000_000
 MASTER_BANK = 10_000_000_000_000
 STARTING_CASH = 50_000
-DATA_LOCK = threading.RLock()
 
 # ══════════════════════════════════════════════════════════════
 # VEHICLE CATALOG

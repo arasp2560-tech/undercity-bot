@@ -1178,6 +1178,29 @@ def find_player_by_username(players: dict, username: str) -> tuple[Optional[str]
 # ══════════════════════════════════════════════════════════════
 
 
+def equipment_menu(user_id: int):
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🛡️ فروشگاه تجهیزات",
+                callback_data=f"equipment_shop|{user_id}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🎒 تجهیزات من",
+                callback_data=f"my_equipment|{user_id}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔙 منوی اصلی",
+                callback_data=f"main|{user_id}"
+            )
+        ],
+    ])
+
+
 def main_menu_keyboard(user_id: int, master: bool = False) -> InlineKeyboardMarkup:
     rows = [
         [

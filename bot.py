@@ -2266,8 +2266,8 @@ if body["hp"] <= 0:
     target["dead_until"] = timestamp() + 600
   
     # احتمال آسیب
-        injury = None
-        roll = random.randint(1, 100)
+            injury = None
+           roll = random.randint(1, 100)
         if roll <= 8 and damage >= 18:
             injury = "fracture"
         elif roll <= 18 and damage >= 14:

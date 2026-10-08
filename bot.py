@@ -1036,7 +1036,7 @@ def execute_money_transfer(
     if int(sender_id) == int(receiver_id):
         return False, "نمی‌توانی به خودت پول انتقال بدهی."
 
-    with DATA_LOCK:
+    
         players = load_players()
         s_key = str(sender_id)
         r_key = str(receiver_id)
@@ -1654,7 +1654,7 @@ async def show_catalog_vehicle(query, catalog_id: str, user_id: int):
 
 
 def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]:
-    with DATA_LOCK:
+    
         players = load_players()
         key = str(buyer_id)
         if key not in players:
@@ -1827,7 +1827,7 @@ async def show_my_vehicle(query, vehicle_id: str, user_id: int):
 
 
 def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
-    with DATA_LOCK:
+
         players = load_players()
         key = str(seller_id)
         if key not in players:
@@ -2242,7 +2242,7 @@ async def handle_attack_part(
         await safe_answer(query, "داده نامعتبر.", True)
         return
 
-    with DATA_LOCK:
+
         players = load_players()
         a_key, t_key = str(attacker_id), str(target_id)
         if a_key not in players or t_key not in players:
@@ -2399,7 +2399,7 @@ async def show_clinic(query, user_id: int):
 
 
 async def treat_all(query, user_id: int):
-    with DATA_LOCK:
+
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2487,7 +2487,7 @@ async def move_district(query, district_id: str, user_id: int):
     if district_id not in DISTRICTS:
         await safe_answer(query, "منطقه نامعتبر.", True)
         return
-    with DATA_LOCK:
+
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2568,7 +2568,7 @@ async def buy_property(query, prop_id: str, user_id: int):
     if not catalog:
         await safe_answer(query, "ملک پیدا نشد.", True)
         return
-    with DATA_LOCK:
+
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2672,7 +2672,7 @@ async def take_course(query, course_id: str, user_id: int):
     if not course:
         await safe_answer(query, "دوره پیدا نشد.", True)
         return
-    with DATA_LOCK:
+
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2993,7 +2993,7 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             return True
 
         vehicle_id = pending.get("vehicle_id")
-        with DATA_LOCK:
+
             players = load_players()
             sender = normalize_player(players[str(user.id)])
             receiver = normalize_player(players[receiver_key])

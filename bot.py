@@ -3593,7 +3593,19 @@ def build_application() -> Application:
             "مثال: export BOT_TOKEN='123456:ABC-DEF...'"
         )
 
-    app = Application.builder().token(token).build()
+app = (
+    Application.builder()
+    .token(token)
+    .connect_timeout(30)
+    .read_timeout(30)
+    .write_timeout(30)
+    .pool_timeout(30)
+    .get_updates_connect_timeout(30)
+    .get_updates_read_timeout(60)
+    .get_updates_write_timeout(30)
+    .get_updates_pool_timeout(30)
+    .build()
+    )
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))

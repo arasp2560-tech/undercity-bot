@@ -2264,21 +2264,20 @@ if body["hp"] <= 0:
     body["hp"] = 0
     target["dead"] = True
     target["dead_until"] = timestamp() + 600
-  
-    # احتمال آسیب
-injury = None
-roll = random.randint(1, 100)
+  # احتمال آسیب
+        injury = None
+        roll = random.randint(1, 100)
 
-if roll <= 8 and damage >= 18:
-    injury = "fracture"
-elif roll <= 18 and damage >= 14:
-    injury = "dislocation"
-elif roll <= 30 and damage >= 12:
-    injury = "bleeding"
-elif roll <= 50 and damage >= 8:
-    injury = "wound"
-elif roll <= 70:
-    injury = "bruise"
+        if roll <= 8 and damage >= 18:
+            injury = "fracture"
+        elif roll <= 18 and damage >= 14:
+            injury = "dislocation"
+        elif roll <= 30 and damage >= 12:
+            injury = "bleeding"
+        elif roll <= 50 and damage >= 8:
+            injury = "wound"
+        elif roll <= 70:
+            injury = "bruise"
 
         if injury:
             body.setdefault("injuries", []).append(
@@ -2293,6 +2292,8 @@ elif roll <= 70:
         attacker["stats"]["fights"] = attacker["stats"].get("fights", 0) + 1
         attacker["stats"]["hits"] = attacker["stats"].get("hits", 0) + 1
         attacker["stats"]["damage_dealt"] = (
+            attacker["stats"].get("damage_dealt", 0) + damage
+)
             attacker["stats"].get("damage_dealt", 0) + damage
         )
         target["stats"]["damage_received"] = (

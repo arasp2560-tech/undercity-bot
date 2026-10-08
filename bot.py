@@ -505,23 +505,56 @@ def run_health_server():
 
 
 # ══════════════════════════════════════════════════════════════
-# DATABASE
+# DATABASE (PostgreSQL + JSONB)
 # ══════════════════════════════════════════════════════════════
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+Base = declarative_base()
+
+
+class PlayerRow(Base):
+    __tablename__ = "players"
+
+    user_id = Column(BigInteger, primary_key=True)
+    data = Column(JSONB, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ساخت جدول اگر وجود نداشته باشد
+Base.metadata.create_all(bind=engine)
 
 
 def load_players() -> dict:
-    with DATA_LOCK:
-        try:
-            with open(PLAYERS_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            pass
-        return {}
+    session = SessionLocal()
+    try:
+        rows = session.query(PlayerRow).all()
+        result = {}
+        for row in rows:
+            result[str(row.user_id)] = row.data
+        return result
+    finally:
+        session.close()
 
 
 def save_players(players: dict) -> None:
+    session = SessionLocal()
+    try:
+        for key, player_data in players.items():
+            user_id = int(key)
+            row = session.get(PlayerRow, user_id)
+            if row:
+                row.data = player_data
+                row.updated_at = datetime.utcnow()
+            else:
+                row = PlayerRow(user_id=user_id, data=player_data)
+                session.add(row)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
     with DATA_LOCK:
         tmp = PLAYERS_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:

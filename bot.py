@@ -2968,7 +2968,7 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             if not vehicle:
                 player["pending"] = None
                 save_player(user.id, player)
-await update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
+update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
                 return True
             remove_vehicle(sender, vehicle_id)
             gifted = copy.deepcopy(vehicle)
@@ -3014,7 +3014,7 @@ await update.message.reply_text("❌ خودرو دیگر در گاراژ نیس�
             pass
         return True
 
-    return False
+        return False
 
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):

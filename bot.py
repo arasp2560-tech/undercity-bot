@@ -1173,9 +1173,9 @@ def find_player_by_username(players: dict, username: str) -> tuple[Optional[str]
     return None, None
 
 
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 # KEYBOARDS
-# ══════════════════════════════════════════════════════════════
+# ==============================================================
 
 
 def equipment_menu(user_id: int):
@@ -1183,45 +1183,85 @@ def equipment_menu(user_id: int):
         [
             InlineKeyboardButton(
                 "🛡️ فروشگاه تجهیزات",
-                callback_data=f"equipment_shop|{user_id}"
-            )
+                callback_data=f"equipment_shop|{user_id}",
+            ),
         ],
         [
             InlineKeyboardButton(
                 "🎒 تجهیزات من",
-                callback_data=f"my_equipment|{user_id}"
-            )
+                callback_data=f"my_equipment|{user_id}",
+            ),
         ],
         [
             InlineKeyboardButton(
                 "🔙 منوی اصلی",
-                callback_data=f"main|{user_id}"
-            )
+                callback_data=f"main|{user_id}",
+            ),
         ],
     ])
 
 
-def main_menu_keyboard(user_id: int, master: bool = False) -> InlineKeyboardMarkup:
+def main_menu_keyboard(
+    user_id: int,
+    master: bool = False,
+) -> InlineKeyboardMarkup:
+
     rows = [
         [
-            InlineKeyboardButton("👤 پروفایل", callback_data=f"profile|{user_id}"),
-            InlineKeyboardButton("💰 کیف پول", callback_data=f"wallet|{user_id}"),
+            InlineKeyboardButton(
+                "👤 پروفایل",
+                callback_data=f"profile|{user_id}",
+            ),
+            InlineKeyboardButton(
+                "💰 کیف پول",
+                callback_data=f"wallet|{user_id}",
+            ),
         ],
         [
-            InlineKeyboardButton("🚗 خودروها", callback_data=f"vehicles|{user_id}"),
-            InlineKeyboardButton("💼 مشاغل", callback_data=f"jobs|{user_id}"),
+            InlineKeyboardButton(
+                "🚗 خودروها",
+                callback_data=f"vehicles|{user_id}",
+            ),
+            InlineKeyboardButton(
+                "💼 مشاغل",
+                callback_data=f"jobs|{user_id}",
+            ),
         ],
         [
-            InlineKeyboardButton("🏠 املاک", callback_data=f"properties|{user_id}"),
-            InlineKeyboardButton("🗺️ مناطق", callback_data=f"districts|{user_id}"),
+            InlineKeyboardButton(
+                "🏠 املاک",
+                callback_data=f"properties|{user_id}",
+            ),
+            InlineKeyboardButton(
+                "🗺️ مناطق",
+                callback_data=f"districts|{user_id}",
+            ),
         ],
         [
-            InlineKeyboardButton("🎓 دوره‌ها", callback_data=f"courses|{user_id}"),
-            InlineKeyboardButton("⚔️ مبارزه", callback_data=f"combat|{user_id}"),
+            InlineKeyboardButton(
+                "🎓 دوره‌ها",
+                callback_data=f"courses|{user_id}",
+            ),
+            InlineKeyboardButton(
+                "⚔️ مبارزه",
+                callback_data=f"combat|{user_id}",
+            ),
         ],
         [
-            InlineKeyboardButton("🏥 کلینیک", callback_data=f"clinic|{user_id}"),
-            InlineKeyboardButton("📖 راهنما", callback_data=f"help|0|{user_id}"),
+            InlineKeyboardButton(
+                "🏥 کلینیک",
+                callback_data=f"clinic|{user_id}",
+            ),
+            InlineKeyboardButton(
+                "🛡️ تجهیزات",
+                callback_data=f"equipment|{user_id}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "📖 راهنما",
+                callback_data=f"help|0|{user_id}",
+            ),
         ],
         [
             InlineKeyboardButton(
@@ -1230,10 +1270,15 @@ def main_menu_keyboard(user_id: int, master: bool = False) -> InlineKeyboardMark
             ),
         ],
     ]
+
     if master:
-        rows.append(
-            [InlineKeyboardButton("👑 پنل Master", callback_data=f"master_panel|{user_id}")]
-        )
+        rows.append([
+            InlineKeyboardButton(
+                "👑 پنل Master",
+                callback_data=f"master_panel|{user_id}",
+            )
+        ])
+
     return InlineKeyboardMarkup(rows)
 
 

@@ -3585,26 +3585,23 @@ def startup():
         save_players(players)
     logger.info("Database ready. Players: %d", len(players))
 
-def build_application() -> Application:
-    token = os.environ.get("BOT_TOKEN", "").strip()
+def build_application():
+    token = os.environ.get("BOT_TOKEN")
     if not token:
-        raise RuntimeError(
-            "BOT_TOKEN environment variable is missing.\n"
-            "مثال: export BOT_TOKEN='123456:ABC-DEF...'"
-        )
+        raise RuntimeError("BOT_TOKEN environment variable is not set")
 
-app = (
-    Application.builder()
-    .token(token)
-    .connect_timeout(30)
-    .read_timeout(30)
-    .write_timeout(30)
-    .pool_timeout(30)
-    .get_updates_connect_timeout(30)
-    .get_updates_read_timeout(60)
-    .get_updates_write_timeout(30)
-    .get_updates_pool_timeout(30)
-    .build()
+    app = (
+        Application.builder()
+        .token(token)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .pool_timeout(30)
+        .get_updates_connect_timeout(30)
+        .get_updates_read_timeout(60)
+        .get_updates_write_timeout(30)
+        .get_updates_pool_timeout(30)
+        .build()
     )
 
     app.add_handler(CommandHandler("start", start_command))
@@ -3613,6 +3610,7 @@ app = (
     app.add_handler(CommandHandler("jobs", jobs_command))
     app.add_handler(CommandHandler("cars", cars_command))
     app.add_handler(CommandHandler("panel", panel_command))
+
     # Master slash commands
     app.add_handler(CommandHandler("ban", master_ban_cmd))
     app.add_handler(CommandHandler("unban", master_unban_cmd))
@@ -3622,13 +3620,13 @@ app = (
     app.add_handler(CommandHandler("setlevel", master_setlevel_cmd))
     app.add_handler(CommandHandler("setxp", master_setxp_cmd))
     app.add_handler(CommandHandler("setrep", master_setrep_cmd))
-    
+
     app.add_handler(CallbackQueryHandler(callback_router))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
     app.add_error_handler(error_handler)
-    return app
 
+    return app
 
 def main():
     print("=" * 60)

@@ -660,7 +660,8 @@ async def safe_edit_message(query, text: str, **kwargs):
         pass
 
 
-# ══════════════════════════════════════════════════════════════
+# 
+══════════════════════════════════════════════════════════════
 # PLAYER SYSTEM
 # ══════════════════════════════════════════════════════════════
 
@@ -1205,7 +1206,7 @@ def help_keyboard(user_id: int, page: int) -> InlineKeyboardMarkup:
     )
     if page < total - 1:
         nav.append(
-          InlineKeyboardButton("بعدی ➡️", callback_data=f"help|{page + 1}|{user_id}")
+            InlineKeyboardButton("بعدی ➡️", callback_data=f"help|{page + 1}|{user_id}")
         )
     return InlineKeyboardMarkup(
         [nav, [InlineKeyboardButton("🏙️ منوی اصلی", callback_data=f"main|{user_id}")]]
@@ -1714,7 +1715,7 @@ async def buy_vehicle(query, catalog_id: str, user_id: int):
         f"💰 قیمت: {format_num(price)}\n"
         f"🆔 {vehicle.get('id')}\n\n"
         "خودرو به گاراژ شما اضافه شد.",
-        parse_mode="HTML",
+    parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("🚗 گاراژ من", callback_data=f"garage|{user_id}")],
@@ -1903,7 +1904,7 @@ async def prepare_gift_car(query, vehicle_id: str, user_id: int):
     save_player(user_id, player)
     await query.edit_message_text(
         f"🎁 <b>انتقال خودرو</b>\n\n"
-            f"🚗 {vehicle_name(vehicle)}\n\n"
+        f"🚗 {vehicle_name(vehicle)}\n\n"
         "شناسه عددی یا @username گیرنده را ارسال کن.\n\n"
         "مثال:\nانتقال خودرو به 123456789\n"
         "یا:\nانتقال خودرو به @username\n\n"
@@ -2294,7 +2295,7 @@ async def handle_attack_part(
 
         attacker["stats"]["fights"] = attacker["stats"].get("fights", 0) + 1
         attacker["stats"]["hits"] = attacker["stats"].get("hits", 0) + 1
-        attacker["stats"]["damage_dealt"] = (
+                attacker["stats"]["damage_dealt"] = (
             attacker["stats"].get("damage_dealt", 0) + damage
         )
         target["stats"]["damage_received"] = (
@@ -2942,61 +2943,40 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             normalize_digits(text),
             re.I,
         )
-                if m:
-            identifier = m.group(1).strip()
+        if m:
+            identifier = m.group(1)
+        players = load_players()
+        receiver_key = None
+        if identifier.isdigit():
+            if str(identifier) in players:
+                receiver_key = str(identifier)
+        else:
+            receiver_key, _ = find_player_by_username(players, identifier)
 
-            players = load_players()
-            receiver_key = None
-
-            if identifier.isdigit():
-                if str(identifier) in players:
-                    receiver_key = str(identifier)
-            else:
-                receiver_key, _ = find_player_by_username(
-                    players,
-                    identifier
-                )
-
-            if not receiver_key:
-                await update.message.reply_text(
-                    "❌ گیرنده پیدا نشد."
-                )
-                return True
-
-            if int(receiver_key) == user.id:
-                await update.message.reply_text(
-                    "❌ نمی‌توانی به خودت هدیه بدهی."
-                )
-                return True
+        if not receiver_key:
+            await update.message.reply_text("❌ گیرنده پیدا نشد.")
+            return True
+        if int(receiver_key) == user.id:
+            await update.message.reply_text("❌ نمی‌توانی به خودت هدیه بدهی.")
+            return True
 
         vehicle_id = pending.get("vehicle_id")
-
         with DATA_LOCK:
             players = load_players()
             sender = normalize_player(players[str(user.id)])
             receiver = normalize_player(players[receiver_key])
-
             vehicle = get_vehicle_by_id(sender, vehicle_id)
-
             if not vehicle:
                 player["pending"] = None
                 save_player(user.id, player)
-
-                await update.message.reply_text(
-                    "❌ خودرو دیگر در گاراژ نیست."
-                )
+                await update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
                 return True
-
             remove_vehicle(sender, vehicle_id)
-
             gifted = copy.deepcopy(vehicle)
             gifted["owner_id"] = int(receiver_key)
             gifted["gifted_at"] = timestamp()
-
             receiver.setdefault("vehicles", []).append(gifted)
-
             ref = make_id("GFT")
-
             add_transaction(
                 sender,
                 "vehicle_gift_sent",
@@ -3005,7 +2985,6 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
                 direction="out",
                 reference_id=ref,
             )
-
             add_transaction(
                 receiver,
                 "vehicle_gift_received",
@@ -3013,7 +2992,6 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
                 f"دریافت هدیه {vehicle_name(vehicle)} از {user.id}",
                 direction="in",
                 reference_id=ref,
-            )
             )
             sender["pending"] = None
             players[str(user.id)] = sender
@@ -3037,7 +3015,7 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             pass
         return True
 
-        return False
+    return False
 
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3638,7 +3616,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-

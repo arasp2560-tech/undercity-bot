@@ -2235,7 +2235,7 @@ async def handle_attack_part(
         mult = BODY_PARTS[part_id]["multiplier"]
         damage = max(1, int(base_dmg * mult))
 
-                # اعمال آسیب
+        # اعمال آسیب
         body = target.setdefault("body", default_body())
         parts = body.setdefault("parts", {})
 
@@ -2296,8 +2296,6 @@ async def handle_attack_part(
         attacker["stats"]["hits"] = attacker["stats"].get("hits", 0) + 1
         attacker["stats"]["damage_dealt"] = (
             attacker["stats"].get("damage_dealt", 0) + damage
-)
-            attacker["stats"].get("damage_dealt", 0) + damage
         )
         target["stats"]["damage_received"] = (
             target["stats"].get("damage_received", 0) + damage
@@ -2305,14 +2303,7 @@ async def handle_attack_part(
         add_xp(attacker, atk["xp"])
 
         players[a_key] = attacker
-        players[t_key] = target
-        save_players(players)
-
-    part_name = BODY_PARTS[part_id]["name"]
-    inj_text = ""
-    if injury:
-        inj_text = f"\n🩸 آسیب: {INJURY_TYPES[injury]['name']}"
-
+       
     await query.edit_message_text(
         f"⚔️ <b>حمله موفق</b>\n\n"
         f"{atk['name']} به {part_name}\n"

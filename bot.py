@@ -555,11 +555,6 @@ def save_players(players: dict) -> None:
         raise
     finally:
         session.close()
-    with DATA_LOCK:
-        tmp = PLAYERS_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(players, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, PLAYERS_FILE)
 
 
 # ══════════════════════════════════════════════════════════════

@@ -23,10 +23,6 @@ import html as html_module
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Optional
 
-from sqlalchemy import create_engine, Column, BigInteger, Text, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.dialects.postgresql import JSONB
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User
 from telegram.error import BadRequest, NetworkError, TimedOut, Forbidden
 from telegram.ext import (
@@ -57,13 +53,12 @@ logger = logging.getLogger("UNDERCITY")
 # ══════════════════════════════════════════════════════════════
 
 PORT = int(os.environ.get("PORT", 10000))
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is not set")
+PLAYERS_FILE = os.environ.get("PLAYERS_FILE", "players.json")
 MASTER_USER_ID = int(os.environ.get("MASTER_USER_ID", "5750241558"))
 MASTER_CASH = 10_000_000_000_000
 MASTER_BANK = 10_000_000_000_000
 STARTING_CASH = 50_000
+DATA_LOCK = threading.RLock()
 
 # ══════════════════════════════════════════════════════════════
 # VEHICLE CATALOG
@@ -505,56 +500,28 @@ def run_health_server():
 
 
 # ══════════════════════════════════════════════════════════════
-# DATABASE (PostgreSQL + JSONB)
+# DATABASE
 # ══════════════════════════════════════════════════════════════
-
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-Base = declarative_base()
-
-
-class PlayerRow(Base):
-    __tablename__ = "players"
-
-    user_id = Column(BigInteger, primary_key=True)
-    data = Column(JSONB, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-# ساخت جدول اگر وجود نداشته باشد
-Base.metadata.create_all(bind=engine)
 
 
 def load_players() -> dict:
-    session = SessionLocal()
-    try:
-        rows = session.query(PlayerRow).all()
-        result = {}
-        for row in rows:
-            result[str(row.user_id)] = row.data
-        return result
-    finally:
-        session.close()
+    with DATA_LOCK:
+        try:
+            with open(PLAYERS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            pass
+        return {}
 
 
 def save_players(players: dict) -> None:
-    session = SessionLocal()
-    try:
-        for key, player_data in players.items():
-            user_id = int(key)
-            row = session.get(PlayerRow, user_id)
-            if row:
-                row.data = player_data
-                row.updated_at = datetime.utcnow()
-            else:
-                row = PlayerRow(user_id=user_id, data=player_data)
-                session.add(row)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+    with DATA_LOCK:
+        tmp = PLAYERS_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(players, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, PLAYERS_FILE)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1036,14 +1003,15 @@ def execute_money_transfer(
     if int(sender_id) == int(receiver_id):
         return False, "نمی‌توانی به خودت پول انتقال بدهی."
 
-    
+    with DATA_LOCK:
         players = load_players()
         s_key = str(sender_id)
         r_key = str(receiver_id)
-    if s_key not in players:
+
+        if s_key not in players:
             return False, "حساب فرستنده پیدا نشد."
 
-    if r_key not in players:
+        if r_key not in players:
             return False, "حساب گیرنده پیدا نشد."
 
         sender = normalize_player(players[s_key])
@@ -1052,7 +1020,7 @@ def execute_money_transfer(
         bank = int(sender.get("bank_balance", 0))
         cash = int(sender.get("cash", 0))
 
-     if bank + cash < amount:
+        if bank + cash < amount:
             return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
 
         from_bank = min(bank, amount)
@@ -1237,7 +1205,7 @@ def help_keyboard(user_id: int, page: int) -> InlineKeyboardMarkup:
     )
     if page < total - 1:
         nav.append(
-            InlineKeyboardButton("بعدی ➡️", callback_data=f"help|{page + 1}|{user_id}")
+          InlineKeyboardButton("بعدی ➡️", callback_data=f"help|{page + 1}|{user_id}")
         )
     return InlineKeyboardMarkup(
         [nav, [InlineKeyboardButton("🏙️ منوی اصلی", callback_data=f"main|{user_id}")]]
@@ -1653,11 +1621,12 @@ async def show_catalog_vehicle(query, catalog_id: str, user_id: int):
 
 
 def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]:
-    
+    with DATA_LOCK:
         players = load_players()
         key = str(buyer_id)
         if key not in players:
             return False, "حساب پیدا نشد."
+
         buyer = normalize_player(players[key])
         if buyer.get("banned"):
             return False, "حساب شما مسدود است."
@@ -1675,8 +1644,8 @@ def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]
         ref = make_id("PUR")
         # جلوگیری از خرید تکراری با همان reference (idempotency ساده)
         for tx in buyer.get("transactions", []):
-        if tx.get("reference_id") == ref:
-           return False, "این خرید قبلاً انجام شده."
+            if tx.get("reference_id") == ref:
+                return False, "این خرید قبلاً انجام شده."
 
         buyer["bank_balance"] -= price
         vehicle = create_vehicle_from_catalog(catalog_id, buyer_id)
@@ -1825,11 +1794,11 @@ async def show_my_vehicle(query, vehicle_id: str, user_id: int):
 
 
 def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
-
+    with DATA_LOCK:
         players = load_players()
         key = str(seller_id)
         if key not in players:
-          return False, "حساب پیدا نشد."
+            return False, "حساب پیدا نشد."
         seller = normalize_player(players[key])
         vehicle = get_vehicle_by_id(seller, vehicle_id)
         if not vehicle:
@@ -1837,11 +1806,12 @@ def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
         price = int(vehicle.get("price", 0))
         if price <= 0:
             return False, "قیمت نامعتبر است."
+
         op_id = hashlib.sha256(
             f"instant_sale:{vehicle_id}:{seller_id}".encode()
         ).hexdigest()[:24]
         for h in seller.get("vehicle_history", []):
-        if h.get("operation_id") == op_id:
+            if h.get("operation_id") == op_id:
                 return True, {"already_done": True, "price": price}
 
         if not remove_vehicle(seller, vehicle_id):
@@ -1933,7 +1903,7 @@ async def prepare_gift_car(query, vehicle_id: str, user_id: int):
     save_player(user_id, player)
     await query.edit_message_text(
         f"🎁 <b>انتقال خودرو</b>\n\n"
-        f"🚗 {vehicle_name(vehicle)}\n\n"
+            f"🚗 {vehicle_name(vehicle)}\n\n"
         "شناسه عددی یا @username گیرنده را ارسال کن.\n\n"
         "مثال:\nانتقال خودرو به 123456789\n"
         "یا:\nانتقال خودرو به @username\n\n"
@@ -2088,7 +2058,7 @@ async def handle_job_action(query, parts: list):
         await query.edit_message_text(text, reply_markup=kb)
         return
 
-        if action == "job_work":
+    if action == "job_work":
         job_key = parts[1] if len(parts) > 2 else "barber"
         if job_key not in JOBS:
             await safe_answer(query, "شغل نامعتبر.", True)
@@ -2181,8 +2151,7 @@ async def start_fight_from_reply(update: Update, context: ContextTypes.DEFAULT_T
 
     rows = []
     for aid, atk in ATTACKS.items():
-
-    if attacker.get("level", 1) >= atk.get("level", 1):
+        if attacker.get("level", 1) >= atk.get("level", 1):
             rows.append(
                 [
                     InlineKeyboardButton(
@@ -2240,7 +2209,7 @@ async def handle_attack_part(
         await safe_answer(query, "داده نامعتبر.", True)
         return
 
-
+    with DATA_LOCK:
         players = load_players()
         a_key, t_key = str(attacker_id), str(target_id)
         if a_key not in players or t_key not in players:
@@ -2248,6 +2217,7 @@ async def handle_attack_part(
             return
         attacker = normalize_player(players[a_key])
         target = normalize_player(players[t_key])
+
         atk = ATTACKS[attack_id]
         if attacker.get("level", 1) < atk.get("level", 1):
             await safe_answer(query, "سطح شما کافی نیست.", True)
@@ -2396,43 +2366,45 @@ async def show_clinic(query, user_id: int):
 
 
 async def treat_all(query, user_id: int):
-    players = load_players()
-    key = str(user_id)
-    if key not in players:
-        await safe_answer(query, "حساب پیدا نشد.", True)
-        return
-    player = normalize_player(players[key])
-    body = player.get("body", default_body())
-    injuries = body.get("injuries", [])
-    if not injuries:
-        await safe_answer(query, "آسیبی برای درمان نیست.")
-        return
-    total = 0
-    for inj in injuries:
-        total += INJURY_TYPES.get(inj.get("type", "bruise"), {}).get("cost", 10000)
-    if player.get("bank_balance", 0) < total and player.get("cash", 0) < total:
-        await safe_answer(query, "پول کافی نیست.", True)
-        return
-    if player.get("bank_balance", 0) >= total:
-        player["bank_balance"] -= total
-    else:
-        player["cash"] -= total
+    with DATA_LOCK:
+        players = load_players()
+        key = str(user_id)
+        if key not in players:
+            await safe_answer(query, "حساب پیدا نشد.", True)
+            return
+        player = normalize_player(players[key])
+        body = player.get("body", default_body())
+        injuries = body.get("injuries", [])
+        if not injuries:
+            await safe_answer(query, "آسیبی برای درمان نیست.")
+            return
+        total = 0
+        for inj in injuries:
+            total += INJURY_TYPES.get(inj.get("type", "bruise"), {}).get("cost", 10000)
+        if player.get("bank_balance", 0) < total and player.get("cash", 0) < total:
+            await safe_answer(query, "پول کافی نیست.", True)
+            return
+        if player.get("bank_balance", 0) >= total:
+            player["bank_balance"] -= total
+        else:
+            player["cash"] -= total
 
-    body["injuries"] = []
-    body["hp"] = body.get("max_hp", 100)
-    for pid, pdata in BODY_PARTS.items():
-        if pid in body.get("parts", {}):
-            body["parts"][pid]["hp"] = pdata["max_hp"]
-    player["body"] = body
-    add_transaction(
-        player,
-        "clinic",
-        total,
-        "درمان کامل در کلینیک",
-        direction="out",
-    )
-    players[key] = player
-    save_players(players)
+        # درمان
+        body["injuries"] = []
+        body["hp"] = body.get("max_hp", 100)
+        for pid, pdata in BODY_PARTS.items():
+            if pid in body.get("parts", {}):
+                body["parts"][pid]["hp"] = pdata["max_hp"]
+        player["body"] = body
+        add_transaction(
+            player,
+            "clinic",
+            total,
+            "درمان کامل در کلینیک",
+            direction="out",
+        )
+        players[key] = player
+        save_players(players)
 
     await query.edit_message_text(
         f"✅ درمان کامل انجام شد.\n💰 هزینه: {format_num(total)}",
@@ -2482,6 +2454,7 @@ async def move_district(query, district_id: str, user_id: int):
     if district_id not in DISTRICTS:
         await safe_answer(query, "منطقه نامعتبر.", True)
         return
+    with DATA_LOCK:
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2562,7 +2535,7 @@ async def buy_property(query, prop_id: str, user_id: int):
     if not catalog:
         await safe_answer(query, "ملک پیدا نشد.", True)
         return
-
+    with DATA_LOCK:
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2579,6 +2552,7 @@ async def buy_property(query, prop_id: str, user_id: int):
         if any(p.get("catalog_id") == prop_id for p in player.get("properties", [])):
             await safe_answer(query, "این ملک را داری.", True)
             return
+
         if catalog["type"] == "rent":
             cost = int(catalog.get("rent", 0))
             # اجاره ماهانه از بانک
@@ -2665,6 +2639,7 @@ async def take_course(query, course_id: str, user_id: int):
     if not course:
         await safe_answer(query, "دوره پیدا نشد.", True)
         return
+    with DATA_LOCK:
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2985,7 +2960,7 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             return True
 
         vehicle_id = pending.get("vehicle_id")
-
+        with DATA_LOCK:
             players = load_players()
             sender = normalize_player(players[str(user.id)])
             receiver = normalize_player(players[receiver_key])
@@ -2993,7 +2968,7 @@ async def process_pending(update: Update, context: ContextTypes.DEFAULT_TYPE, te
             if not vehicle:
                 player["pending"] = None
                 save_player(user.id, player)
-                await update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
+await update.message.reply_text("❌ خودرو دیگر در گاراژ نیست.")
                 return True
             remove_vehicle(sender, vehicle_id)
             gifted = copy.deepcopy(vehicle)
@@ -3562,11 +3537,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 def startup():
+    # اطمینان از وجود فایل دیتابیس
+    if not os.path.exists(PLAYERS_FILE):
+        save_players({})
     players = load_players()
     for uid, p in list(players.items()):
         players[uid] = normalize_player(p)
-    if players:
-        save_players(players)
+    save_players(players)
     logger.info("Database ready. Players: %d", len(players))
 
 
@@ -3638,3 +3615,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+

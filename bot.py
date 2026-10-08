@@ -3791,6 +3791,7 @@ def main():
 
     app = build_application()
     logger.info("Starting polling...")
+    logger.info("POLLING ABOUT TO START")
 
     try:
         app.run_polling(

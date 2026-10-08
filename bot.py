@@ -1040,7 +1040,6 @@ def execute_money_transfer(
         players = load_players()
         s_key = str(sender_id)
         r_key = str(receiver_id)
-
     if s_key not in players:
             return False, "حساب فرستنده پیدا نشد."
 
@@ -1659,7 +1658,6 @@ def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]
         key = str(buyer_id)
         if key not in players:
             return False, "حساب پیدا نشد."
-
         buyer = normalize_player(players[key])
         if buyer.get("banned"):
             return False, "حساب شما مسدود است."
@@ -1839,7 +1837,6 @@ def execute_instant_sell(seller_id: int, vehicle_id: str) -> tuple[bool, Any]:
         price = int(vehicle.get("price", 0))
         if price <= 0:
             return False, "قیمت نامعتبر است."
-
         op_id = hashlib.sha256(
             f"instant_sale:{vehicle_id}:{seller_id}".encode()
         ).hexdigest()[:24]
@@ -2251,7 +2248,6 @@ async def handle_attack_part(
             return
         attacker = normalize_player(players[a_key])
         target = normalize_player(players[t_key])
-
         atk = ATTACKS[attack_id]
         if attacker.get("level", 1) < atk.get("level", 1):
             await safe_answer(query, "سطح شما کافی نیست.", True)
@@ -2422,7 +2418,6 @@ async def treat_all(query, user_id: int):
     else:
         player["cash"] -= total
 
-    # درمان
     body["injuries"] = []
     body["hp"] = body.get("max_hp", 100)
     for pid, pdata in BODY_PARTS.items():
@@ -2487,7 +2482,6 @@ async def move_district(query, district_id: str, user_id: int):
     if district_id not in DISTRICTS:
         await safe_answer(query, "منطقه نامعتبر.", True)
         return
-
         players = load_players()
         key = str(user_id)
         if key not in players:
@@ -2585,7 +2579,6 @@ async def buy_property(query, prop_id: str, user_id: int):
         if any(p.get("catalog_id") == prop_id for p in player.get("properties", [])):
             await safe_answer(query, "این ملک را داری.", True)
             return
-
         if catalog["type"] == "rent":
             cost = int(catalog.get("rent", 0))
             # اجاره ماهانه از بانک
@@ -2672,7 +2665,6 @@ async def take_course(query, course_id: str, user_id: int):
     if not course:
         await safe_answer(query, "دوره پیدا نشد.", True)
         return
-
         players = load_players()
         key = str(user_id)
         if key not in players:

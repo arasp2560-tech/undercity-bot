@@ -3575,13 +3575,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 def startup():
-    # اطمینان از وجود فایل دیتابیس
-    if not os.path.exists(PLAYERS_FILE):
-        save_players({})
     players = load_players()
     for uid, p in list(players.items()):
         players[uid] = normalize_player(p)
-    save_players(players)
+    if players:
+        save_players(players)
     logger.info("Database ready. Players: %d", len(players))
 
 

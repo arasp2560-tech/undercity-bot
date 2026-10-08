@@ -3488,6 +3488,54 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_wallet(query, user_id)
         elif action == "transactions":
             await show_transactions(query, user_id)
+        elif action == "equipment":
+            await query.edit_message_text(
+                "🛡️ <b>تجهیزات</b>\n\n"
+                "از گزینه‌های زیر استفاده کن:",
+                parse_mode="HTML",
+                reply_markup=equipment_menu(user_id),
+            )
+        elif action == "equipment_shop":
+            buttons = []
+            for equip_id, item in EQUIPMENT.items():
+                price = int(item.get("price", 0))
+                buttons.append([
+                    InlineKeyboardButton(
+                        f"💰 {item['name']} — {price:,}",
+                        callback_data=f"buyequip|{equip_id}|{user_id}",
+                    )
+                ])
+            buttons.append([
+                InlineKeyboardButton(
+                    "🔙 بازگشت",
+                    callback_data=f"equipment|{user_id}",
+                )
+            ])
+            await query.edit_message_text(
+                "🛍️ <b>فروشگاه تجهیزات</b>\n\n"
+                "تجهیزات موردنظر خود را انتخاب کن:",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+        elif action == "my_equipment":
+            player = get_player(query.from_user)
+            equipment = player.get("equipment", {})
+            clothes = equipment.get("clothes", "normal_clothes")
+            armor = equipment.get("armor")
+            weapons = equipment.get("weapons", [])
+            clothes_name = EQUIPMENT.get(clothes, {}).get("name", clothes)
+            armor_name = EQUIPMENT.get(armor, {}).get("name", "ندارد") if armor else "ندارد"
+            text = (
+                "🎒 <b>تجهیزات من</b>\n\n"
+                f"👕 لباس: {clothes_name}\n"
+                f"🛡️ زره: {armor_name}\n"
+                f"🔪 تعداد سلاح‌ها: {len(weapons)}"
+            )
+            await query.edit_message_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=equipment_menu(user_id),
+            )
         elif action == "help":
             if len(parts) >= 2 and parts[1] != "noop":
                 page = int(parts[1])

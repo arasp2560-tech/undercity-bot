@@ -3459,10 +3459,6 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parts = data.split("|")
     action = parts[0]
 
-    try:
-        await query.answer()
-    except Exception:
-        pass
 
     # مالکیت
     if action not in ("noop",) and not is_owner(query):
@@ -3721,12 +3717,19 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_answer(query, "دسترسی ندارید.", True)
         else:
             await safe_answer(query, "گزینه پیدا نشد.", True)
+
     except Exception as e:
         logger.exception("Callback error: %s", e)
+
         try:
-            await query.answer("⚠️ خطایی رخ داد.", show_alert=True)
+            await safe_answer(
+                query,
+                "⚠️ هنگام اجرای این عملیات خطایی رخ داد.",
+                True,
+            )
         except Exception:
             pass
+
 
 
 # ══════════════════════════════════════════════════════════════

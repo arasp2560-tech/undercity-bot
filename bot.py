@@ -3633,11 +3633,11 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-            if int(player.get("bank_balance", 0)) < price:
-                await safe_answer(query, "❌ موجودی بانک کافی نیست.", True)
+            if int(player.get("cash", 0)) < price:
+                await safe_answer(query, "❌ موجودی کیف پول کافی نیست.", True)
                 return
 
-            player["bank_balance"] -= price
+            player["cash"] -= price
 
             if equip_id in ("normal_clothes", "leather_jacket"):
                 equipment["clothes"] = equip_id

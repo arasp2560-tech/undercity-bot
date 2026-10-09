@@ -3543,19 +3543,23 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=equipment_menu(user_id),
             )
-
-        elif action == "buyequip" and len(parts) >= 2:
-            equip_id = parts[1]
-            await safe_answer(query, "⏳ خرید تجهیزات هنوز به سیستم خرید متصل نشده.", True)
-
+            
         elif action == "help":
             if len(parts) >= 2 and parts[1] != "noop":
-                page = int(parts[1])
-                page = max(0, min(page, len(HELP_PAGES) - 1))
-                await query.edit_message_text(
-                    help_page_text(page),
-                    reply_markup=help_keyboard(user_id, page),
-                )
+                try:
+                    page = int(parts[1])
+                except (TypeError, ValueError):
+                    page = 0
+            else:
+                page = 0
+
+            page = max(0, min(page, len(HELP_PAGES) - 1))
+
+            await safe_edit_message(
+                query,
+                help_page_text(page),
+                reply_markup=help_keyboard(user_id, page),
+            )
 
         elif action == "vehicles":
             await query.edit_message_text(

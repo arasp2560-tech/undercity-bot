@@ -1746,7 +1746,7 @@ def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]
         price = int(catalog.get("price", 0))
         if price <= 0:
             return False, "قیمت نامعتبر است."
-        if buyer.get("bank_balance", 0) < price:
+        if buyer.get("cash", 0) < price:
             return False, "موجودی بانک کافی نیست."
 
         ref = make_id("PUR")
@@ -1755,7 +1755,7 @@ def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]
             if tx.get("reference_id") == ref:
                 return False, "این خرید قبلاً انجام شده."
 
-        buyer["bank_balance"] -= price
+        buyer["cash"] -= price
         vehicle = create_vehicle_from_catalog(catalog_id, buyer_id)
         vehicle["purchase_price"] = price
         vehicle["purchase_reference"] = ref

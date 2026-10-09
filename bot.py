@@ -1747,7 +1747,7 @@ def execute_vehicle_purchase(buyer_id: int, catalog_id: str) -> tuple[bool, Any]
         if price <= 0:
             return False, "قیمت نامعتبر است."
         if buyer.get("cash", 0) < price:
-            return False, "موجودی بانک کافی نیست."
+            return False, "موجودی کیف پول کافی نیست."
 
         ref = make_id("PUR")
         # جلوگیری از خرید تکراری با همان reference (idempotency ساده)

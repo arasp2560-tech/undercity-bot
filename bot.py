@@ -1061,7 +1061,7 @@ def execute_money_transfer(
         cash = int(sender.get("cash", 0))
 
         if bank + cash < amount:
-            return False, "موجودی کافی نیست. بانک و نقد با هم کم می‌شود."
+            return False, "موجودی کافی نیست. از پول نقد(کیف پول) کم می‌شود."
 
         from_bank = min(bank, amount)
         from_cash = amount - from_bank

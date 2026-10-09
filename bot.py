@@ -3600,6 +3600,73 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=back_button(user_id, "vehicles"),
         )
+
+        elif action == "buyequip" and len(parts) >= 2:
+            equip_id = parts[1]
+            item = EQUIPMENT.get(equip_id)
+
+            if not item:
+                await safe_answer(query, "❌ تجهیزات پیدا نشد.", True)
+                return
+
+            equipment = player.setdefault("equipment", {})
+            equipment.setdefault("clothes", "normal_clothes")
+            equipment.setdefault("armor", None)
+            equipment.setdefault("weapons", [])
+
+            if equip_id in (
+                equipment.get("clothes"),
+                equipment.get("armor"),
+                *equipment.get("weapons", []),
+            ):
+                await safe_answer(query, "⚠️ این وسیله را قبلاً تهیه کرده‌ای.", True)
+                return
+
+            price = int(item.get("price", 0))
+            required_level = int(item.get("level", 1))
+
+            if int(player.get("level", 1)) < required_level:
+                await safe_answer(
+                    query,
+                    f"🔒 سطح لازم برای خرید: {required_level}",
+                    True,
+                )
+                return
+
+            if int(player.get("bank_balance", 0)) < price:
+                await safe_answer(query, "❌ موجودی بانک کافی نیست.", True)
+                return
+
+            player["bank_balance"] -= price
+
+            if equip_id in ("normal_clothes", "leather_jacket"):
+                equipment["clothes"] = equip_id
+            elif equip_id in ("body_armor", "helmet"):
+                equipment["armor"] = equip_id
+            elif item.get("weapon"):
+                equipment["weapons"].append(equip_id)
+
+            add_transaction(
+                player,
+                "equipment_purchase",
+                price,
+                f"خرید تجهیزات: {item['name']}",
+                direction="out",
+                reference_id=make_id("EQP"),
+            )
+
+            save_player(user_id, player)
+
+            await safe_edit_message(
+                query,
+                "✅ <b>خرید موفق بود!</b>\n\n"
+                f"🛡️ وسیله: {esc(item['name'])}\n"
+                f"💰 قیمت: {format_num(price)}\n"
+                f"🏦 موجودی بانک: {format_num(player['bank_balance'])}",
+                parse_mode="HTML",
+                reply_markup=equipment_menu(user_id),
+            )
+
         elif action in ("jobs", "job", "job_work", "job_skills"):
             await handle_job_action(query, parts)
         elif action == "districts":

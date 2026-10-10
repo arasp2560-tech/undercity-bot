@@ -24,7 +24,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Optional
 from sqlalchemy import create_engine, Column, BigInteger, Text, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, insert as pg_insert
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User
 from telegram.error import BadRequest, NetworkError, TimedOut, Forbidden

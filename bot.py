@@ -545,17 +545,16 @@ def load_players() -> dict:
 
 
 def save_players(players: dict) -> None:
+    if not players:
+        return
+
     session = SessionLocal()
     try:
-        for key, player_data in players.items():
-            user_id = int(key)
-            row = session.get(PlayerRow, user_id)
-            if row:
-                row.data = player_data
-                row.updated_at = datetime.utcnow()
-            else:
-                row = PlayerRow(user_id=user_id, data=player_data)
-                session.add(row)
+        now = datetime.utcnow()
+        rows = [{"user_id": int(key), "data": data, "updated_at": now} for key, data in players.items()]
+        stmt = pg_insert(PlayerRow).values(rows)
+        stmt = stmt.on_conflict_do_update(index_elements=["user_id"], set_={"data": stmt.excluded.data, "updated_at": now})
+        session.execute(stmt)
         session.commit()
     except Exception:
         session.rollback()
